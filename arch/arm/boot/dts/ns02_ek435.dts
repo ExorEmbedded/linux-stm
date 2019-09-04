@@ -273,7 +273,11 @@
 					 <STM32_PINMUX('B', 4, AF9)>, /* SDMMC2_D3 */
 					 <STM32_PINMUX('B', 14, AF9)>, /* SDMMC2_D0 */
 					 <STM32_PINMUX('B', 15, AF9)>, /* SDMMC2_D1 */
-					 <STM32_PINMUX('G', 6, AF10)>; /* SDMMC2_CMD */
+					 <STM32_PINMUX('G', 6, AF10)>, /* SDMMC2_CMD */
+					 <STM32_PINMUX('A', 8, AF9)>, /* SDMMC2_D4 */
+					 <STM32_PINMUX('B', 9, AF10)>, /* SDMMC2_D5 */
+					 <STM32_PINMUX('C', 6, AF10)>, /* SDMMC2_D6 */
+					 <STM32_PINMUX('C', 7, AF10)>; /* SDMMC2_D7 */
 			bias-disable;
 			drive-push-pull;
 			slew-rate = <1>;
@@ -294,7 +298,11 @@
 			pinmux = <STM32_PINMUX('B', 3, AF9)>, /* SDMMC2_D2 */
 					 <STM32_PINMUX('B', 4, AF9)>, /* SDMMC2_D3 */
 					 <STM32_PINMUX('B', 14, AF9)>, /* SDMMC2_D0 */
-					 <STM32_PINMUX('B', 15, AF9)>; /* SDMMC2_D1 */
+					 <STM32_PINMUX('B', 15, AF9)>, /* SDMMC2_D1 */
+					 <STM32_PINMUX('A', 8, AF9)>, /* SDMMC2_D4 */
+					 <STM32_PINMUX('B', 9, AF10)>, /* SDMMC2_D5 */
+					 <STM32_PINMUX('C', 6, AF10)>, /* SDMMC2_D6 */
+					 <STM32_PINMUX('C', 7, AF10)>; /* SDMMC2_D7 */
 			bias-disable;
 			drive-push-pull;
 			slew-rate = <1>;
@@ -324,7 +332,11 @@
 					 <STM32_PINMUX('B', 14, ANALOG)>, /* SDMMC2_D0 */
 					 <STM32_PINMUX('B', 15, ANALOG)>, /* SDMMC2_D1 */
 					 <STM32_PINMUX('E', 3, ANALOG)>, /* SDMMC2_CK */
-					 <STM32_PINMUX('G', 6, ANALOG)>; /* SDMMC2_CMD */
+					 <STM32_PINMUX('G', 6, ANALOG)>, /* SDMMC2_CMD */
+					 <STM32_PINMUX('A', 8, ANALOG)>, /* SDMMC2_D4 */
+					 <STM32_PINMUX('B', 9, ANALOG)>, /* SDMMC2_D5 */
+					 <STM32_PINMUX('C', 6, ANALOG)>, /* SDMMC2_D6 */
+					 <STM32_PINMUX('C', 7, ANALOG)>; /* SDMMC2_D7 */
 		};
 	};
 
@@ -574,7 +586,7 @@
 	/* USER CODE BEGIN sdmmc2 */
 	non-removable;
 	st,neg-edge;
-	bus-width = <4>;
+	bus-width = <8>;
 	vmmc-supply = <&v3v3>;
 	keep-power-in-suspend;
 	/* USER CODE END sdmmc2 */
