@@ -113,8 +113,21 @@
             reg = <0>;
             regulator-name = "dummy-3v3-supply";
             regulator-boot-on;
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
         };
-	};
+
+		reg_sd1_vmmc: sd1_regulator {
+			compatible = "regulator-fixed";
+			regulator-name = "sdcard_enable";
+			reg = <1>;
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-boot-on;
+			regulator-always-on;
+			enable-active-low;
+		};
+};
 	
 	/* USER CODE END root */
 
@@ -545,7 +558,7 @@
 	broken-cd;
 	st,neg-edge;
 	bus-width = <4>;
-	vmmc-supply = <&v3v3>;
+	vmmc-supply = <&reg_sd1_vmmc>;
 	keep-power-in-suspend;
 	/* USER CODE END sdmmc1 */
 };
