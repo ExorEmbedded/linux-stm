@@ -185,23 +185,6 @@
 		};
 	};
 
-	i2c2_pins_mx: i2c2_mx-0 {
-		pins {
-			pinmux = <STM32_PINMUX('H', 5, AF4)>, /* I2C2_SDA */
-					 <STM32_PINMUX('Z', 4, AF3)>; /* I2C2_SCL */
-			bias-pull-up;
-			drive-open-drain;
-			slew-rate = <0>;
-		};
-	};
-
-	i2c2_sleep_pins_mx: i2c2_sleep_mx-0 {
-		pins {
-			pinmux = <STM32_PINMUX('H', 5, ANALOG)>, /* I2C2_SDA */
-					 <STM32_PINMUX('Z', 4, ANALOG)>; /* I2C2_SCL */
-		};
-	};
-
 	sdmmc1_pins_mx: sdmmc1_mx-0 {
 		u-boot,dm-pre-reloc;
 		pins1 {
@@ -369,28 +352,6 @@
 	/* USER CODE END pinctrl */
 };
 
-&pinctrl_z {
-	u-boot,dm-pre-reloc;
-
-	i2c2_pins_z_mx: i2c2_mx-0 {
-		pins {
-			pinmux = <STM32_PINMUX('Z', 4, AF3)>; /* I2C2_SCL */
-			bias-disable;
-			drive-open-drain;
-			slew-rate = <0>;
-		};
-	};
-
-	i2c2_sleep_pins_z_mx: i2c2_sleep_mx-0 {
-		pins {
-			pinmux = <STM32_PINMUX('Z', 4, ANALOG)>; /* I2C2_SCL */
-		};
-	};
-
-	/* USER CODE BEGIN pinctrl_z */
-	/* USER CODE END pinctrl_z */
-};
-
 &m4_rproc{
 	mboxes = <&ipcc 0>, <&ipcc 1>, <&ipcc 2>;
 	mbox-names = "vq0", "vq1", "shutdown";
@@ -434,9 +395,9 @@
 
 &i2c2{
 	pinctrl-names = "default", "sleep";
-	pinctrl-0 = <&i2c2_pins_mx &i2c2_pins_z_mx>;
-	pinctrl-1 = <&i2c2_sleep_pins_mx &i2c2_sleep_pins_z_mx>;
 	status = "okay";
+	
+	/*NOTE: pinmux still set by bootloader */
 
 	/* USER CODE BEGIN i2c2 */
 	pmic: stpmic@33 {
