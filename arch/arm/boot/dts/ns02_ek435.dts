@@ -390,6 +390,32 @@
 	i2c-scl-falling-time-ns = <7>;
 	/delete-property/dmas;
 	/delete-property/dma-names;
+	
+	seeprom0:seeprom0@54 {
+		compatible = "atmel,24c02";
+		reg = <0x54>;
+	};
+
+	seeprom1:seeprom1@50 {
+		compatible = "atmel,24c02";
+		reg = <0x50>;
+	};
+
+	seeprom2:seeprom2@51 {
+		compatible = "atmel,24c02";
+		reg = <0x51>;
+	};
+	
+	m41t83:m41t83@68 {
+		compatible = "stm,m41t83";
+		reg = <0x68>;
+	};
+
+	htu21d@40 {
+	  /* Temperature/humidity */
+	  compatible = "htu21";
+	  reg = <0x40>;
+	};	
 	/* USER CODE END i2c1 */
 };
 
