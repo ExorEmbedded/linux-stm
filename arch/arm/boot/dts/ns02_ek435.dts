@@ -102,6 +102,22 @@
 	ns02_rst {
           soft_rst_gpio = <&gpioz 5 GPIO_ACTIVE_HIGH>;
 	};
+	
+	leds:leds {
+		compatible = "gpio-leds";
+        
+        dlled@1 {
+            label = "ns02:dl:usr0";
+            gpios = <&gpiof 13 GPIO_ACTIVE_HIGH>;
+            default-state = "on";
+        };
+  
+        faultled@2 {
+            label = "ns02:fault:usr0";
+            gpios = <&gpioz 7 GPIO_ACTIVE_LOW>;
+            default-state = "off";
+        };
+	};
 
     regulators {
         compatible = "simple-bus";
