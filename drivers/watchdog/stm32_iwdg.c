@@ -243,6 +243,11 @@ static int stm32_iwdg_probe(struct platform_device *pdev)
 		dev_warn(&pdev->dev,
 			 "unable to set timeout value, using default\n");
 
+	/* Since the wdt was activated by the u-boot bootloader, we must inform the upper layers that the wdt core is still running and must be
+	   refreshed by kernel, until somoene else will take care to do it. */
+	stm32_iwdg_start(wdd);
+	set_bit(WDOG_HW_RUNNING, &wdd->status);
+		
 	ret = watchdog_register_device(wdd);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to register watchdog device\n");
