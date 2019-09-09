@@ -144,7 +144,20 @@
 			enable-active-low;
 		};
 };
-	
+
+	panel_rgb: panel-rgb {
+		compatible = "ampire,am-480272h3tmqw-t01h";
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&ns02_ltdc_pins>;
+		pinctrl-1 = <&ns02_ltdc_pins_sleep>;
+		status = "okay";
+		port {
+			panel_in_rgb: endpoint {
+				remote-endpoint = <&ltdc_out_rgb>;
+			};
+		};
+	};
+
 	/* USER CODE END root */
 
 	clocks {
@@ -365,6 +378,58 @@
 	};
 
 	/* USER CODE BEGIN pinctrl */
+	ns02_ltdc_pins: ltdc-ns02-0 {
+		pins {
+			pinmux = <STM32_PINMUX('G',  7, AF14)>, /* LCD_CLK */
+					 <STM32_PINMUX('I', 10, AF14)>, /* LCD_HSYNC */
+					 <STM32_PINMUX('I',  9, AF14)>, /* LCD_VSYNC */
+					 <STM32_PINMUX('F', 10, AF14)>, /* LCD_DE */
+					 <STM32_PINMUX('H',  9, AF14)>, /* LCD_R3 */
+					 <STM32_PINMUX('A', 11, AF14)>, /* LCD_R4 */
+					 <STM32_PINMUX('C',  0, AF14)>, /* LCD_R5 */
+					 <STM32_PINMUX('H', 12, AF14)>, /* LCD_R6 */
+					 <STM32_PINMUX('E', 15, AF14)>, /* LCD_R7 */
+					 <STM32_PINMUX('H', 13, AF14)>, /* LCD_G2 */
+					 <STM32_PINMUX('G', 10, AF9 )>, /* LCD_G3 */
+					 <STM32_PINMUX('H',  4, AF14)>, /* LCD_G4 */
+					 <STM32_PINMUX('I',  0, AF14)>, /* LCD_G5 */
+					 <STM32_PINMUX('I', 11, AF9 )>, /* LCD_G6 */
+					 <STM32_PINMUX('G',  8, AF14)>, /* LCD_G7 */
+					 <STM32_PINMUX('G', 11, AF14)>, /* LCD_B3 */
+					 <STM32_PINMUX('I',  4, AF14)>, /* LCD_B4 */
+					 <STM32_PINMUX('I',  5, AF14)>, /* LCD_B5 */
+					 <STM32_PINMUX('I',  6, AF14)>, /* LCD_B6 */
+					 <STM32_PINMUX('D',  8, AF14)>; /* LCD_B7 */
+					bias-disable;
+					drive-push-pull;
+					slew-rate = <1>;
+		};
+	};
+
+	ns02_ltdc_pins_sleep: ltdc-ns02-1 {
+		pins {
+			pinmux = <STM32_PINMUX('G',  7, ANALOG)>, /* LCD_CLK */
+					 <STM32_PINMUX('I', 10, ANALOG)>, /* LCD_HSYNC */
+					 <STM32_PINMUX('I',  9, ANALOG)>, /* LCD_VSYNC */
+					 <STM32_PINMUX('F', 10, ANALOG)>, /* LCD_DE */
+					 <STM32_PINMUX('H',  9, ANALOG)>, /* LCD_R3 */
+					 <STM32_PINMUX('A', 11, ANALOG)>, /* LCD_R4 */
+					 <STM32_PINMUX('C',  0, ANALOG)>, /* LCD_R5 */
+					 <STM32_PINMUX('H', 12, ANALOG)>, /* LCD_R6 */
+					 <STM32_PINMUX('E', 15, ANALOG)>, /* LCD_R7 */
+					 <STM32_PINMUX('H', 13, ANALOG)>, /* LCD_G2 */
+					 <STM32_PINMUX('G', 10, ANALOG)>, /* LCD_G3 */
+					 <STM32_PINMUX('H',  4, ANALOG)>, /* LCD_G4 */
+					 <STM32_PINMUX('I',  0, ANALOG)>, /* LCD_G5 */
+					 <STM32_PINMUX('I', 11, ANALOG)>, /* LCD_G6 */
+					 <STM32_PINMUX('G',  8, ANALOG)>, /* LCD_G7 */
+					 <STM32_PINMUX('G', 11, ANALOG)>, /* LCD_B3 */
+					 <STM32_PINMUX('I',  4, ANALOG)>, /* LCD_B4 */
+					 <STM32_PINMUX('I',  5, ANALOG)>, /* LCD_B5 */
+					 <STM32_PINMUX('I',  6, ANALOG)>, /* LCD_B6 */
+					 <STM32_PINMUX('D',  8, ANALOG)>; /* LCD_B7 */
+		};
+	};
 	/* USER CODE END pinctrl */
 };
 
@@ -644,6 +709,23 @@
 
 &usbphyc_port1 {
 	st,phy-tuning = <&usb_phy_tuning>;
+};
+
+&ltdc {
+	status = "okay";
+	port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		ltdc_out_rgb: endpoint {
+			remote-endpoint = <&panel_in_rgb>;
+		};
+	};
+};
+
+&gpu {
+	contiguous-area = <&gpu_reserved>;
+	status = "okay";
 };
 
 /* USER CODE BEGIN addons */
