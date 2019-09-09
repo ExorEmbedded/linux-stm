@@ -150,6 +150,7 @@
 		pinctrl-names = "default", "sleep";
 		pinctrl-0 = <&ns02_ltdc_pins>;
 		pinctrl-1 = <&ns02_ltdc_pins_sleep>;
+		enable-gpios = <&gpiof 4 GPIO_ACTIVE_HIGH>;
 		status = "okay";
 		port {
 			panel_in_rgb: endpoint {
