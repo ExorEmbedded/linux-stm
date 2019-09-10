@@ -146,7 +146,7 @@
 };
 
 	panel_rgb: panel-rgb {
-		compatible = "ampire,am-480272h3tmqw-t01h";
+		compatible = "exor,hw_dispid";
 		pinctrl-names = "default", "sleep";
 		pinctrl-0 = <&ns02_ltdc_pins>;
 		pinctrl-1 = <&ns02_ltdc_pins_sleep>;

@@ -35,6 +35,63 @@
 
 #include <video/display_timing.h>
 #include <video/videomode.h>
+#include <video/displayconfig.h>
+
+/*----------------------------------------------------------------------------------------------------------------*
+   Helper functions to retrieve the display id value, when passed from the cmdline, and use it to set the
+   display parameters/timings.
+ *----------------------------------------------------------------------------------------------------------------*/
+extern int hw_dispid; //This is an exported variable holding the display id value, if passed from cmdline
+
+int dispid_get_videomode(struct videomode* vm, int dispid)
+{
+	int i=0;
+
+	// Scan the display array to search for the required dispid
+	if(dispid == NODISPLAY)
+		return -1;
+
+	while((displayconfig[i].dispid != NODISPLAY) && (displayconfig[i].dispid != dispid))
+		i++;
+
+	if(displayconfig[i].dispid == NODISPLAY)
+		return -1;
+
+	// If we are here, we have a valid array index pointing to the desired display
+	vm->hactive         = displayconfig[i].rezx;
+	vm->hback_porch  = displayconfig[i].hs_bp;
+	vm->hfront_porch = displayconfig[i].hs_fp;
+	vm->hsync_len    = displayconfig[i].hs_w;
+
+	vm->vactive         = displayconfig[i].rezy;
+	vm->vback_porch = displayconfig[i].vs_bp;
+	vm->vfront_porch = displayconfig[i].vs_fp;
+	vm->vsync_len    = displayconfig[i].vs_w;
+	vm->pixelclock = 1000 * displayconfig[i].pclk_freq;
+
+	vm->flags = 0;
+	if(displayconfig[i].hs_inv == 0)
+		vm->flags |= DISPLAY_FLAGS_HSYNC_HIGH;
+	else
+		vm->flags |= DISPLAY_FLAGS_HSYNC_LOW;
+
+	if(displayconfig[i].vs_inv == 0)
+		vm->flags |= DISPLAY_FLAGS_VSYNC_HIGH;
+	else
+		vm->flags |= DISPLAY_FLAGS_VSYNC_LOW;
+
+	if(displayconfig[i].blank_inv == 0)
+		vm->flags |= DISPLAY_FLAGS_DE_HIGH;
+	else
+		vm->flags |= DISPLAY_FLAGS_DE_LOW;
+
+	if(displayconfig[i].pclk_inv == 0)
+		vm->flags |= DISPLAY_FLAGS_PIXDATA_POSEDGE;
+	else
+		vm->flags |= DISPLAY_FLAGS_PIXDATA_NEGEDGE;
+
+	return 0;
+}
 
 struct panel_desc {
 	const struct drm_display_mode *modes;
@@ -103,6 +160,16 @@ static int panel_simple_get_fixed_modes(struct panel_simple *panel)
 
 	if (!panel->desc)
 		return 0;
+
+	if((panel->desc->num_timings==0) && (panel->desc->num_modes==1))
+	{	/* Override the display mode with the one specified by displayconfig.h file and the hw_dispid param, passed from cmdline, if any */
+		struct videomode vm;
+		if(!dispid_get_videomode(&vm, hw_dispid))
+		{
+			struct drm_display_mode *dmode = (struct drm_display_mode *)&panel->desc->modes[0];
+			drm_display_mode_from_videomode(&vm, dmode);
+		}
+	}
 
 	for (i = 0; i < panel->desc->num_timings; i++) {
 		const struct display_timing *dt = &panel->desc->timings[i];
@@ -2323,6 +2390,35 @@ static const struct panel_desc winstar_wf35ltiacd = {
 	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
 };
 
+static const struct drm_display_mode exor_hwdispid_mode = {
+	.clock = 9000,
+	.hdisplay = 480,
+	.hsync_start = 480 + 2,
+	.hsync_end = 480 + 2 + 41,
+	.htotal = 480 + 2 + 41 + 2,
+	.vdisplay = 272,
+	.vsync_start = 272 + 2,
+	.vsync_end = 272 + 2 + 10,
+	.vtotal = 272 + 2 + 10 + 2,
+	.vrefresh = 60,
+	.flags = DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC,
+};
+
+static const struct panel_desc exor_hwdispid = {
+	.modes = &exor_hwdispid_mode,
+	.num_modes = 1,
+	.bpc = 6,
+	.size = {
+		.width = 152,
+		.height = 91,
+	},
+	.delay = {
+		.prepare = 110,
+		.enable = 50,
+		.unprepare = 550,
+	},
+};
+
 static const struct of_device_id platform_of_match[] = {
 	{
 		.compatible = "ampire,am-480272h3tmqw-t01h",
@@ -2573,6 +2669,9 @@ static const struct of_device_id platform_of_match[] = {
 	}, {
 		.compatible = "winstar,wf35ltiacd",
 		.data = &winstar_wf35ltiacd,
+	}, {
+		.compatible = "exor,hw_dispid",
+		.data = &exor_hwdispid,
 	}, {
 		/* sentinel */
 	}
