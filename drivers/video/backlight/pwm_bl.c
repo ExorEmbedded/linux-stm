@@ -24,6 +24,7 @@
 #include <linux/pwm_backlight.h>
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
+#include <video/displayconfig.h>
 
 struct pwm_bl_data {
 	struct pwm_device	*pwm;
@@ -45,6 +46,71 @@ struct pwm_bl_data {
 	int			(*check_fb)(struct device *, struct fb_info *);
 	void			(*exit)(struct device *);
 };
+/*----------------------------------------------------------------------------------------------------------------*
+Exported function which allows to get the actual backlight enable status from kernel.
+It is needed for example by the working hours driver to correctly compute the effective backlight on time.
+*----------------------------------------------------------------------------------------------------------------*/
+bool pwm_backlight_is_enabled(struct backlight_device* bl)
+{
+    struct pwm_bl_data *pb = bl_get_data(bl);
+    return pb->enabled;
+}
+EXPORT_SYMBOL(pwm_backlight_is_enabled);
+
+/*----------------------------------------------------------------------------------------------------------------*
+Helper functions to retrieve the display id value, when passed from the cmdline, and use it to set the
+backlight parameters (the contents of the DTB file are overridden, if a valid dispaly id is passed from
+cmdline.)
+*----------------------------------------------------------------------------------------------------------------*/
+extern int hw_dispid; //Exported variable which holds the display id value, when passed from the cmdline
+
+/*
+* Writes the pwm_bl_data structure according with the contents of the displayconfig.h file and the passed dispid parameter.
+* Returns 0 if success, -1 if failure (ie: no match found)
+*/
+int dispid_get_backlight(struct pwm_bl_data* pb, int dispid, int maxlevels)
+{
+    int i=0;
+    int j;
+    int step = 0;
+
+    // Scan the display array to search for the required dispid
+    if(dispid == NODISPLAY)
+        return -1;
+
+    while((displayconfig[i].dispid != NODISPLAY) && (displayconfig[i].dispid != dispid))
+        i++;
+
+    if(displayconfig[i].dispid == NODISPLAY)
+        return -1;
+
+    // If we are here, we have a valid array index pointing to the desired display
+    // Configure the backlight controller, based on a 0-100% dutycycle range.
+    pb->lth_brightness = 0;
+    pb->scale = 100;
+
+    if(displayconfig[i].pwmfreq == 0)
+	displayconfig[i].pwmfreq = 1000;
+
+    pb->period = 1000000000l / displayconfig[i].pwmfreq;
+
+    //Now override the levels based on linear interpolation between brightness_min and brightness_max
+    if(displayconfig[i].brightness_max > 100)
+        displayconfig[i].brightness_max = 100;
+
+    if(displayconfig[i].brightness_min > displayconfig[i].brightness_max)
+	displayconfig[i].brightness_min = displayconfig[i].brightness_max;
+
+    if(maxlevels > 1)
+        step = 100 * (displayconfig[i].brightness_max - displayconfig[i].brightness_min) / (maxlevels-1);
+    for(j=1; j<maxlevels; j++)
+        pb->levels[j] = displayconfig[i].brightness_min + (step *(j-1))/100;
+
+    pb->levels[1] = displayconfig[i].brightness_min;
+    pb->levels[maxlevels] = displayconfig[i].brightness_max;
+
+    return 0;
+}
 
 static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
 {
@@ -578,6 +644,8 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 		pb->period = data->pwm_period_ns;
 
 	pb->lth_brightness = data->lth_brightness * (pb->period / pb->scale);
+
+	dispid_get_backlight(pb, hw_dispid, data->max_brightness);
 
 	memset(&props, 0, sizeof(struct backlight_properties));
 	props.type = BACKLIGHT_RAW;
