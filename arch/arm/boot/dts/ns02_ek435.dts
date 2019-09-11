@@ -80,6 +80,7 @@
 	/* USER CODE BEGIN root */
 	aliases {
 		serial0 = &uart5;
+		ethernet1 = &usbeth;
 	};
 
 	chosen {
@@ -743,6 +744,24 @@
 
 &usbphyc_port1 {
 	st,phy-tuning = <&usb_phy_tuning>;
+};
+
+&usbh_ehci {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	usb1@1 {
+		compatible = "usb424,9512";
+        #address-cells = <1>;
+        #size-cells = <0>;
+		reg = <1>;
+
+		usbeth: usbether@1 {
+			compatible = "usb424,ec00";
+			reg = <1>;
+			/* Filled in by U-Boot */
+			mac-address = [ 00 00 00 00 00 00 ];			
+		};
+	};
 };
 
 &ltdc {
