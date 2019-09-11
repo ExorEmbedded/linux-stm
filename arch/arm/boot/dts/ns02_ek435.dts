@@ -151,6 +151,7 @@
 		pinctrl-0 = <&ns02_ltdc_pins>;
 		pinctrl-1 = <&ns02_ltdc_pins_sleep>;
 		enable-gpios = <&gpiof 4 GPIO_ACTIVE_HIGH>;
+		backlight = <&backlight>;
 		status = "okay";
 		port {
 			panel_in_rgb: endpoint {
@@ -159,6 +160,15 @@
 		};
 	};
 
+    backlight: backlight {
+        compatible = "pwm-backlight";
+        pwms = <&pwm2 0 50000 0>;
+        brightness-levels = <0 4 8 12 16 20 24 28 32 36 40 44 48 52 56 60 64 68 72 76 80 84 88 92 96 100>;
+        default-brightness-level = <25>;
+        enable-gpios = <&gpiof 2 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+    };
+	
 	/* USER CODE END root */
 
 	clocks {
@@ -429,6 +439,21 @@
 					 <STM32_PINMUX('I',  5, ANALOG)>, /* LCD_B5 */
 					 <STM32_PINMUX('I',  6, ANALOG)>, /* LCD_B6 */
 					 <STM32_PINMUX('D',  8, ANALOG)>; /* LCD_B7 */
+		};
+	};
+	
+	pwm2bl_pins: pwm2bl-pins-0 {
+		pins {
+			pinmux = <STM32_PINMUX('A',  5, AF1)>; /* DIMM */
+			bias-pull-down;
+			drive-push-pull;
+			slew-rate = <0>;
+		};
+	};
+
+	pwm2bl_sleep_pins: pwm2bl-pins-1 {
+		pins {
+			pinmux = <STM32_PINMUX('A',  5, ANALOG)>; /* DIMM */
 		};
 	};
 	/* USER CODE END pinctrl */
@@ -741,6 +766,20 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 
 &dma2 {
 	sram = <&dma_pool>;
+};
+
+/* PWM backlight dimming */
+&timers2 {
+	status = "okay";
+	/* spare dmas for other usage */
+	/delete-property/dmas;
+	/delete-property/dma-names;
+	pwm2: pwm {
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&pwm2bl_pins>;
+		pinctrl-1 = <&pwm2bl_sleep_pins>;
+		status = "okay";
+		};
 };
 /* USER CODE END addons */
 
