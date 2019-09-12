@@ -178,7 +178,12 @@
 	  backlight = <&backlight>;
 	  status = "okay";
 	};
-    
+
+	beeper {
+	  compatible = "pwm-beeper";
+	  pwms = <&pwm5 0 50000 0>;
+	};
+	
 	/* USER CODE END root */
 
 	clocks {
@@ -464,6 +469,21 @@
 	pwm2bl_sleep_pins: pwm2bl-pins-1 {
 		pins {
 			pinmux = <STM32_PINMUX('A',  5, ANALOG)>; /* DIMM */
+		};
+	};
+
+	pwm5beep_pins: pwm5beep-pins-0 {
+		pins {
+			pinmux = <STM32_PINMUX('A',  0, AF2)>; /* BEEPER */
+			bias-pull-down;
+			drive-push-pull;
+			slew-rate = <0>;
+		};
+	};
+
+	pwm5beep_sleep_pins: pwm5beep-pins-1 {
+		pins {
+			pinmux = <STM32_PINMUX('A',  0, ANALOG)>; /* BEEPER */
 		};
 	};
 	
@@ -831,7 +851,7 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 	sram = <&dma_pool>;
 };
 
-/* PWM backlight dimming */
+/* PWM for backlight dimming */
 &timers2 {
 	status = "okay";
 	/* spare dmas for other usage */
@@ -841,6 +861,20 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 		pinctrl-names = "default", "sleep";
 		pinctrl-0 = <&pwm2bl_pins>;
 		pinctrl-1 = <&pwm2bl_sleep_pins>;
+		status = "okay";
+		};
+};
+
+/* PWM for beeper */
+&timers5 {
+	status = "okay";
+	/* spare dmas for other usage */
+	/delete-property/dmas;
+	/delete-property/dma-names;
+	pwm5: pwm {
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&pwm5beep_pins>;
+		pinctrl-1 = <&pwm5beep_sleep_pins>;
 		status = "okay";
 		};
 };
