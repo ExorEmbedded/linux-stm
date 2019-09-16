@@ -86,9 +86,9 @@ int dispid_get_videomode(struct videomode* vm, int dispid)
 		vm->flags |= DISPLAY_FLAGS_DE_LOW;
 
 	if(displayconfig[i].pclk_inv == 0)
-		vm->flags |= DISPLAY_FLAGS_PIXDATA_POSEDGE;
-	else
 		vm->flags |= DISPLAY_FLAGS_PIXDATA_NEGEDGE;
+	else
+		vm->flags |= DISPLAY_FLAGS_PIXDATA_POSEDGE;
 
 	return 0;
 }
