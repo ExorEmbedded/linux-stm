@@ -521,6 +521,26 @@
 			bias-disable;
 		};
 	};
+
+	can0_pins: m_can0-0 {
+		pins1 {
+			pinmux = <STM32_PINMUX('A', 12, AF9)>; /* CAN1_TX */
+			slew-rate = <0>;
+			drive-push-pull;
+			bias-disable;
+		};
+		pins2 {
+			pinmux = <STM32_PINMUX('D', 0, AF9)>; /* CAN1_RX */
+			bias-disable;
+		};
+	};
+
+	can0_pins_sleep: m_can0-1 {
+		pins {
+			pinmux = <STM32_PINMUX('A', 12, ANALOG)>, /* CAN1_TX */
+			<STM32_PINMUX('D', 0, ANALOG)>; /* CAN1_RX */
+		};
+	};
 	/* USER CODE END pinctrl */
 };
 
@@ -899,5 +919,12 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 	};
 };
 
+/* can0 */
+&m_can1 {
+	status = "okay";
+	pinctrl-0 = <&can0_pins>;
+	pinctrl-1 = <&can0_pins_sleep>;
+	pinctrl-names = "default", "sleep";
+};
 /* USER CODE END addons */
 
