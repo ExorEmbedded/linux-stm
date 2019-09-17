@@ -157,6 +157,7 @@ static int panel_simple_get_fixed_modes(struct panel_simple *panel)
 	struct drm_device *drm = panel->base.drm;
 	struct drm_display_mode *mode;
 	unsigned int i, num = 0;
+	int hw_dispidfound=0;
 
 	if (!panel->desc)
 		return 0;
@@ -166,53 +167,69 @@ static int panel_simple_get_fixed_modes(struct panel_simple *panel)
 		struct videomode vm;
 		if(!dispid_get_videomode(&vm, hw_dispid))
 		{
-			struct drm_display_mode *dmode = (struct drm_display_mode *)&panel->desc->modes[0];
-			drm_display_mode_from_videomode(&vm, dmode);
+			const struct drm_display_mode *m = &panel->desc->modes[0];
+			hw_dispidfound=1;
+
+			mode = drm_mode_duplicate(drm, m);
+			if (!mode) {
+				dev_err(drm->dev, "failed to add mode %ux%u@%u\n",m->hdisplay, m->vdisplay, m->vrefresh);
+				return 0;
+			}
+			
+			drm_display_mode_from_videomode(&vm, mode);
+			mode->type |= DRM_MODE_TYPE_DRIVER;
+			mode->type |= DRM_MODE_TYPE_PREFERRED;
+			drm_mode_set_name(mode);
+			drm_mode_probed_add(connector, mode);
+			num++;
 		}
 	}
+	
+	if(hw_dispidfound==0)
+	{
+		for (i = 0; i < panel->desc->num_timings; i++) {
+			const struct display_timing *dt = &panel->desc->timings[i];
+			struct videomode vm;
 
-	for (i = 0; i < panel->desc->num_timings; i++) {
-		const struct display_timing *dt = &panel->desc->timings[i];
-		struct videomode vm;
+			videomode_from_timing(dt, &vm);
+			mode = drm_mode_create(drm);
+			if (!mode) {
+				dev_err(drm->dev, "failed to add mode %ux%u\n",
+					dt->hactive.typ, dt->vactive.typ);
+				continue;
+			}
 
-		videomode_from_timing(dt, &vm);
-		mode = drm_mode_create(drm);
-		if (!mode) {
-			dev_err(drm->dev, "failed to add mode %ux%u\n",
-				dt->hactive.typ, dt->vactive.typ);
-			continue;
+			drm_display_mode_from_videomode(&vm, mode);
+
+			mode->type |= DRM_MODE_TYPE_DRIVER;
+
+			if (panel->desc->num_timings == 1)
+				mode->type |= DRM_MODE_TYPE_PREFERRED;
+
+			drm_mode_probed_add(connector, mode);
+			num++;
 		}
 
-		drm_display_mode_from_videomode(&vm, mode);
+		for (i = 0; i < panel->desc->num_modes; i++) {
+			const struct drm_display_mode *m = &panel->desc->modes[i];
 
-		mode->type |= DRM_MODE_TYPE_DRIVER;
+			mode = drm_mode_duplicate(drm, m);
+			if (!mode) {
+				dev_err(drm->dev, "failed to add mode %ux%u@%u\n",
+					m->hdisplay, m->vdisplay, m->vrefresh);
+				continue;
+			}
 
-		if (panel->desc->num_timings == 1)
-			mode->type |= DRM_MODE_TYPE_PREFERRED;
+			mode->type |= DRM_MODE_TYPE_DRIVER;
 
-		drm_mode_probed_add(connector, mode);
-		num++;
-	}
+			if (panel->desc->num_modes == 1)
+				mode->type |= DRM_MODE_TYPE_PREFERRED;
 
-	for (i = 0; i < panel->desc->num_modes; i++) {
-		const struct drm_display_mode *m = &panel->desc->modes[i];
+			drm_mode_set_name(mode);
 
-		mode = drm_mode_duplicate(drm, m);
-		if (!mode) {
-			dev_err(drm->dev, "failed to add mode %ux%u@%u\n",
-				m->hdisplay, m->vdisplay, m->vrefresh);
-			continue;
+			drm_mode_probed_add(connector, mode);
+			num++;
 		}
-
-		mode->type |= DRM_MODE_TYPE_DRIVER;
-
-		if (panel->desc->num_modes == 1)
-			mode->type |= DRM_MODE_TYPE_PREFERRED;
-
-		drm_mode_set_name(mode);
-
-		drm_mode_probed_add(connector, mode);
-		num++;
 	}
 
 	connector->display_info.bpc = panel->desc->bpc;
