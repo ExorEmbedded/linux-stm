@@ -145,6 +145,15 @@
 			regulator-always-on;
 			enable-active-low;
 		};
+		
+		dac_vcc: fixedregulator@1 {
+			compatible = "regulator-fixed";
+			regulator-name = "fixed-supply";
+			reg = <2>;
+			regulator-min-microvolt = <5000000>;
+			regulator-max-microvolt = <5000000>;
+			regulator-boot-on;
+		};		
 };
 
 	panel_rgb: panel-rgb {
@@ -608,6 +617,24 @@
 	  compatible = "htu21";
 	  reg = <0x40>;
 	};	
+
+
+	ad5321@0c {
+	  /* DAC */
+	  compatible = "adi,ad5321";
+	  reg = <0x0c>;
+	  vcc-supply = <&dac_vcc>;
+	  #io-channel-cells = < 0 >;
+	};	
+
+	ad5321@0d {
+	  /* DAC */
+	  compatible = "adi,ad5321";
+	  reg = <0x0d>;
+	  vcc-supply = <&dac_vcc>;
+	  #io-channel-cells = < 0 >;
+	};	
+	
 	/* USER CODE END i2c1 */
 };
 

@@ -520,10 +520,19 @@ static inline void ad5446_spi_unregister_driver(void) { }
 
 static int ad5622_write(struct ad5446_state *st, unsigned val)
 {
+	int ret = 0;
 	struct i2c_client *client = to_i2c_client(st->dev);
 	__be16 data = cpu_to_be16(val);
 
-	return i2c_master_send(client, (char *)&data, sizeof(data));
+	ret = i2c_master_send(client, (char *)&data, sizeof(data));
+	
+	/* In case of success, the upper layers expect a value of 0, not the number of bytes transferred
+	 * so we need to adjust the retrun value accordingly.
+	 * */
+	if(ret > 0)
+		ret = 0;
+	
+	return ret;
 }
 
 /**
