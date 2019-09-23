@@ -956,24 +956,13 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 
 /* adc */
 &adc{
-	vdd-supply = <&vdda>;
-	vdda-supply = <&vdda>;
 	vref-supply = <&vrefbuf>;
 	status = "okay";
 
-	adc1: adc@0 {
-		st,adc-channels = <0>;
-		st,min-sample-time-nsecs = <10000>;
-		assigned-resolution-bits = <12>;
-		status = "okay";
-	};
 	adc2: adc@100 {
-		st,adc-channels = <1>;
+		st,adc-channels = <0 1>;
 		st,min-sample-time-nsecs = <10000>;
 		assigned-resolution-bits = <12>;
-		status = "okay";
-	};
-	adc_temp: temp {
 		status = "okay";
 	};
 };

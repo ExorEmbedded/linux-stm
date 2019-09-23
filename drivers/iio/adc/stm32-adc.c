@@ -202,7 +202,7 @@ enum stm32h7_adc_dmngt {
 #define STM32_ADC_MAX_SMP		7	/* SMPx range is [0..7] */
 #define STM32_ADC_TIMEOUT_US		100000
 #define STM32_ADC_TIMEOUT	(msecs_to_jiffies(STM32_ADC_TIMEOUT_US / 1000))
-#define STM32_ADC_HW_STOP_DELAY_MS	100
+#define STM32_ADC_HW_STOP_DELAY_MS	10000
 
 #define STM32_DMA_BUFFER_SIZE		PAGE_SIZE
 
