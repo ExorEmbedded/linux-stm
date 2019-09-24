@@ -279,6 +279,10 @@ struct stm32_port {
 	int wakeirq;
 	struct pinctrl_state *console_pins;
 	int rdr_mask;		/* receive data register mask */
+	int rts_gpio;         /* GPIO used as tx_en line for RS485 operation */
+	int mode_gpio;        /* If a valid gpio is mapped here, it means we have a programmable RS485/RS232 phy */
+	int rxen_gpio;        /* If a valid gpio is mapped here, we will use it for disabling the RX echo while in RS485 mode */
+	int mode_two_lines_only;	
 };
 
 static struct stm32_port stm32_ports[STM32_MAX_PORTS];

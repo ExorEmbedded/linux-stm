@@ -35,11 +35,169 @@
 #include <linux/sysrq.h>
 #include <linux/tty_flip.h>
 #include <linux/tty.h>
+#include <linux/of_gpio.h>
+#include <linux/gpio.h>
 
 #include "stm32-usart.h"
 
 static void stm32_stop_tx(struct uart_port *port);
 static void stm32_transmit_chars(struct uart_port *port);
+static void stm32_clr_bits(struct uart_port *port, u32 reg, u32 bits);
+
+static void stm32_rs485_stop_tx(struct uart_port *port)
+{
+	struct stm32_port *sport = (struct stm32_port *)port;
+	struct stm32_usart_offsets *ofs = &sport->info->ofs;
+
+	if ((sport->rts_gpio >= 0) && (port->rs485.flags & SER_RS485_ENABLED))
+	  if ((port->rs485.flags & SER_RS485_RTS_AFTER_SEND) == 0)
+	    gpio_set_value(sport->rts_gpio, 0);
+	
+	if ((port->rs485.flags & SER_RS485_ENABLED) && !(port->rs485.flags & SER_RS485_RX_DURING_TX)) 
+	{
+	  //RX enable by using the prg phy dedicated gpio pin
+	  if (gpio_is_valid(sport->rxen_gpio)) 
+	    gpio_set_value(sport->rxen_gpio, 1);
+	}
+	
+	stm32_clr_bits(port, ofs->cr1, USART_CR1_TCIE);
+}
+
+static void stm32_rs485_start_tx(struct uart_port *port)
+{
+	struct stm32_port *sport = (struct stm32_port *)port;
+	if ((port->rs485.flags & SER_RS485_ENABLED) && !(port->rs485.flags & SER_RS485_RX_DURING_TX))
+	{
+	  //RX disable by using the prg phy dedicated gpio pin 
+	  if (gpio_is_valid(sport->rxen_gpio)) 
+	    gpio_set_value(sport->rxen_gpio, 0);
+	}
+  
+	if ((sport->rts_gpio >= 0) && (port->rs485.flags & SER_RS485_ENABLED))
+		gpio_set_value(sport->rts_gpio, 1);
+}
+
+static void stm32_setup_rs485(struct uart_port *port)
+{
+	struct stm32_port *sport = (struct stm32_port *)port;
+	printk("%s\n", __func__) ;
+
+	printk("--------- Setting UART /dev/ttySTM%d mode...\n", sport->port.line);
+	printk("--------- SER_RS485_ENABLED=%d \n", (port->rs485.flags & SER_RS485_ENABLED));
+
+	if (sport->rts_gpio >= 0)
+	{
+  	  gpio_set_value(sport->rts_gpio, 0);
+	  if (port->rs485.flags & SER_RS485_ENABLED)
+	  {
+	    if(port->rs485.flags & SER_RS485_RX_DURING_TX)
+	    {
+		printk("Setting UART to RS422\n");
+	    }
+	    else
+	    {
+		printk("Setting UART to RS485\n");
+	    }
+	  }
+	  else
+	  {
+		printk("Setting UART to RS232\n");
+		/*
+		* If we are in RS232 mode and we have a programmable phy, enable the TX if not yet done.
+		*/
+		if (gpio_is_valid(sport->mode_gpio))
+		{
+		  if(sport->mode_two_lines_only)
+		  {
+			  gpio_set_value(sport->rts_gpio, 0);
+		  }
+		  else 
+		  {
+			  gpio_set_value(sport->rts_gpio, 1);
+		  }
+		}
+	  }
+	}
+	
+	// If we have a programmable phy, set the mode accordingly
+	if (gpio_is_valid(sport->mode_gpio)) 
+	{
+	  if(port->rs485.flags & SER_RS485_ENABLED)
+	    gpio_set_value(sport->mode_gpio, 1);
+	  else
+	    gpio_set_value(sport->mode_gpio, 0);
+	}
+
+	//RX enable by using the prg phy dedicated gpio pin 
+	if (gpio_is_valid(sport->rxen_gpio)) 
+	  gpio_set_value(sport->rxen_gpio, 1);
+}
+
+static int stm32_of_prgphy_probe(struct stm32_port *sport, struct platform_device *pdev)
+{
+	struct device_node *np = pdev->dev.of_node;
+	int ret;
+	
+	//Get rts-gpio line (used for tx enable 1=active)
+	sport->rts_gpio = -EINVAL;
+	ret = of_get_named_gpio(np, "rts-gpio", 0);
+	if (ret >= 0 && gpio_is_valid(ret))
+	{
+		printk("Setting UART /dev/ttymxc%d with the pin %d as rts-gpio\n", sport->port.line, ret);
+		sport->rts_gpio = ret;
+
+		ret = gpio_request(sport->rts_gpio, "rts-gpio");
+		if(ret < 0)
+			return ret;
+
+		ret = gpio_direction_output(sport->rts_gpio, 0);
+		if(ret < 0)
+			return ret;
+	}
+
+	// Get mode-gpio line, which is used to switch from RS485 <-> RS232 on programmable phys
+	sport->mode_gpio = -EINVAL;
+	ret = of_get_named_gpio(np, "mode-gpio", 0);
+	if (ret >= 0 && gpio_is_valid(ret))
+	{
+		printk("Setting UART /dev/ttymxc%d with the pin %d as mode-gpio\n", sport->port.line, ret);
+		sport->mode_gpio = ret;
+
+		ret = gpio_request(sport->mode_gpio, "mode-gpio");
+		if(ret < 0)
+			return ret;
+
+		ret = gpio_direction_output(sport->mode_gpio, 0);
+		if(ret < 0)
+			return ret;
+	}
+
+	// Get rxen-gpio, which is used to enable/disable the rx on programmable phys
+	sport->rxen_gpio = -EINVAL;
+	ret = of_get_named_gpio(np, "rxen-gpio", 0);
+	if (ret >= 0 && gpio_is_valid(ret))
+	{
+		printk("Setting UART /dev/ttymxc%d with the pin %d as rxen-gpio\n", sport->port.line, ret);
+		sport->rxen_gpio = ret;
+
+		ret = gpio_request(sport->rxen_gpio, "rxen-gpio");
+		if(ret < 0)
+			return ret;
+
+		ret = gpio_direction_output(sport->rxen_gpio, 1);
+		if(ret < 0)
+			return ret;
+	}
+
+	if (of_property_read_bool(np, "mode-two-lines-only"))
+	{
+	    sport->mode_two_lines_only = 1;
+	    printk("Setting UART /dev/ttymxc%d with two wires serial mode \n", sport->port.line );
+	} else {
+	    sport->mode_two_lines_only = 0;
+	}
+	return 0;
+}
 
 static inline struct stm32_port *to_stm32_port(struct uart_port *port)
 {
@@ -147,6 +305,7 @@ static int stm32_config_rs485(struct uart_port *port,
 	}
 
 	stm32_set_bits(port, ofs->cr1, BIT(cfg->uart_enable_bit));
+	stm32_setup_rs485(port);
 
 	return 0;
 }
@@ -470,6 +629,7 @@ static irqreturn_t stm32_interrupt(int irq, void *ptr)
 	struct stm32_port *stm32_port = to_stm32_port(port);
 	struct stm32_usart_offsets *ofs = &stm32_port->info->ofs;
 	u32 sr;
+	u32 cr1;
 
 	spin_lock(&port->lock);
 
@@ -489,6 +649,13 @@ static irqreturn_t stm32_interrupt(int irq, void *ptr)
 	if ((sr & USART_SR_TXE) && !(stm32_port->tx_ch))
 		stm32_transmit_chars(port);
 
+	if (sr & USART_SR_TC)
+	{
+		cr1 = readl_relaxed(port->membase + ofs->cr1);
+		if(cr1 & USART_CR1_TCIE)
+			stm32_rs485_stop_tx(port);
+	}
+	
 	spin_unlock(&port->lock);
 
 	if (stm32_port->rx_ch)
@@ -565,17 +732,57 @@ static void stm32_stop_tx(struct uart_port *port)
 		dmaengine_terminate_async(stm32_port->tx_ch);
 		stm32_clr_bits(port, ofs->cr3, USART_CR3_DMAT);
 	}
+	
+	if(port->rs485.flags & SER_RS485_ENABLED)
+	{
+		struct circ_buf *xmit = &port->state->xmit;
+		if (uart_circ_empty(xmit))
+		{
+			u32	sr = readl_relaxed(port->membase + ofs->isr);
+			if (sr & USART_SR_TC)
+				stm32_rs485_stop_tx(port);
+		}
+	}
 }
 
 /* There are probably characters waiting to be transmitted. */
 static void stm32_start_tx(struct uart_port *port)
 {
 	struct circ_buf *xmit = &port->state->xmit;
+	struct stm32_port *sport = (struct stm32_port *)port;
+	struct stm32_usart_offsets *ofs = &sport->info->ofs;
 
 	if (uart_circ_empty(xmit))
 		return;
 
+	if (port->rs485.flags & SER_RS485_ENABLED)
+	{   //If we are in RS485 mode, set the prg phy accordingly
+		stm32_rs485_start_tx(port);
+	}
+	else
+	{  // If we are in RS232 mode and we have a programmable phy, enable the TX if not yet done.
+		if (gpio_is_valid(sport->rts_gpio))
+		{
+			if(sport->mode_two_lines_only)
+			{
+				gpio_set_value(sport->rts_gpio, 0);
+				
+			}
+			else
+			{
+				gpio_set_value(sport->rts_gpio, 1);
+			}
+	    }
+	}
+
 	stm32_transmit_chars(port);
+	
+	if ((uart_circ_empty(xmit)) && (port->rs485.flags & SER_RS485_ENABLED))
+	{ // Enable the TX complete IRQ to handle the RS485 mode with the prg phy
+		stm32_set_bits(port, ofs->cr1, USART_CR1_TCIE);
+	}
+	else
+		stm32_clr_bits(port, ofs->cr1, USART_CR1_TCIE);
 }
 
 /* Flush the transmit buffer. */
@@ -904,6 +1111,7 @@ static void stm32_set_termios(struct uart_port *port, struct ktermios *termios,
 	writel_relaxed(cr1, port->membase + ofs->cr1);
 
 	stm32_set_bits(port, ofs->cr1, BIT(cfg->uart_enable_bit));
+	stm32_setup_rs485(port);
 	spin_unlock_irqrestore(&port->lock, flags);
 }
 
@@ -1265,6 +1473,8 @@ static int stm32_serial_probe(struct platform_device *pdev)
 	if (ret)
 		dev_info(&pdev->dev, "interrupt mode used for tx (no dma)\n");
 
+	stm32_of_prgphy_probe(stm32port, pdev);
+	
 	platform_set_drvdata(pdev, &stm32port->port);
 
 	pm_runtime_get_noresume(&pdev->dev);
