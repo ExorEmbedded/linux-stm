@@ -83,6 +83,7 @@
 		serial1 = &uart7;
 		ethernet1 = &usbeth;
 		ethernet0 = &ethernet0;
+		spi0 = &spi3;
 	};
 
 	chosen {
@@ -566,6 +567,21 @@
 			<STM32_PINMUX('D', 0, ANALOG)>; /* CAN1_RX */
 		};
 	};
+
+	spi3_pins_ns02: spi3-0 {
+		pins1 {
+			pinmux = <STM32_PINMUX('E', 0, AF5)>, /* SPI3_SCK */
+					 <STM32_PINMUX('B', 2, AF7)>; /* SPI3_MOSI */
+					 bias-disable;
+					 drive-push-pull;
+					 slew-rate = <1>;
+			};
+			pins2 {
+					 pinmux = <STM32_PINMUX('D', 10, AF5)>; /* SPI1_MISO */
+					 bias-disable;
+			};
+	};
+
 	/* USER CODE END pinctrl */
 };
 
@@ -998,5 +1014,22 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 	status = "okay";
 };
 
+/* SPI dev */
+&spi3 {
+	status = "okay";
+
+	pinctrl-0 = <&spi3_pins_ns02>;
+	pinctrl-names = "default";
+	cs-gpios = <&gpiof 9 GPIO_ACTIVE_LOW>;
+	/delete-property/dmas;
+	/delete-property/dma-names;
+	
+	
+	spidev0_0: spi3@0 {
+		compatible = "generic,spidev";
+		reg = <0>;
+		spi-max-frequency = <1000000>;
+	};
+};
 /* USER CODE END addons */
 
