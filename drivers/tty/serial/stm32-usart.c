@@ -621,6 +621,14 @@ static void stm32_transmit_chars(struct uart_port *port)
 		else
 			stm32_clr_bits(port, ofs->cr1, USART_CR1_TXEIE);
 	}
+
+	if ((uart_circ_empty(xmit)) && (port->rs485.flags & SER_RS485_ENABLED))
+	{ // Enable the TX complete IRQ to handle the RS485 mode with the prg phy
+		stm32_set_bits(port, ofs->cr1, USART_CR1_TCIE);
+	}
+	else
+		stm32_clr_bits(port, ofs->cr1, USART_CR1_TCIE);
+	
 }
 
 static irqreturn_t stm32_interrupt(int irq, void *ptr)
@@ -750,7 +758,6 @@ static void stm32_start_tx(struct uart_port *port)
 {
 	struct circ_buf *xmit = &port->state->xmit;
 	struct stm32_port *sport = (struct stm32_port *)port;
-	struct stm32_usart_offsets *ofs = &sport->info->ofs;
 
 	if (uart_circ_empty(xmit))
 		return;
@@ -776,13 +783,6 @@ static void stm32_start_tx(struct uart_port *port)
 	}
 
 	stm32_transmit_chars(port);
-	
-	if ((uart_circ_empty(xmit)) && (port->rs485.flags & SER_RS485_ENABLED))
-	{ // Enable the TX complete IRQ to handle the RS485 mode with the prg phy
-		stm32_set_bits(port, ofs->cr1, USART_CR1_TCIE);
-	}
-	else
-		stm32_clr_bits(port, ofs->cr1, USART_CR1_TCIE);
 }
 
 /* Flush the transmit buffer. */
