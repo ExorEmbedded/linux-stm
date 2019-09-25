@@ -84,6 +84,7 @@
 		ethernet1 = &usbeth;
 		ethernet0 = &ethernet0;
 		spi0 = &spi3;
+		spi1 = &spi5;
 	};
 
 	chosen {
@@ -577,11 +578,25 @@
 					 slew-rate = <1>;
 			};
 			pins2 {
-					 pinmux = <STM32_PINMUX('D', 10, AF5)>; /* SPI1_MISO */
+					 pinmux = <STM32_PINMUX('D', 10, AF5)>; /* SPI3_MISO */
 					 bias-disable;
 			};
 	};
 
+	spi5_pins_ns02: spi5-0 {
+		pins1 {
+			pinmux = <STM32_PINMUX('H', 6, AF5)>, /* SPI5_SCK */
+					 <STM32_PINMUX('F',11, AF5)>; /* SPI5_MOSI */
+					 bias-disable;
+					 drive-push-pull;
+					 slew-rate = <1>;
+			};
+			pins2 {
+					 pinmux = <STM32_PINMUX('F', 8, AF5)>; /* SPI5_MISO */
+					 bias-disable;
+			};
+	};
+	
 	/* USER CODE END pinctrl */
 };
 
@@ -1026,6 +1041,23 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 	
 	
 	spidev0_0: spi3@0 {
+		compatible = "generic,spidev";
+		reg = <0>;
+		spi-max-frequency = <1000000>;
+	};
+};
+
+&spi5 {
+	status = "okay";
+
+	pinctrl-0 = <&spi5_pins_ns02>;
+	pinctrl-names = "default";
+	cs-gpios = <&gpiof 6 GPIO_ACTIVE_LOW>;
+	/delete-property/dmas;
+	/delete-property/dma-names;
+	
+	
+	spidev1_0: spi5@0 {
 		compatible = "generic,spidev";
 		reg = <0>;
 		spi-max-frequency = <1000000>;
