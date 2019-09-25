@@ -80,6 +80,7 @@
 	/* USER CODE BEGIN root */
 	aliases {
 		serial0 = &uart5;
+		serial1 = &uart7;
 		ethernet1 = &usbeth;
 		ethernet0 = &ethernet0;
 	};
@@ -411,7 +412,22 @@
 					 <STM32_PINMUX('B', 13, ANALOG)>; /* UART5_TX */
 		};
 	};
-
+	
+	uart7_pins_mx: uart7_mx-0 {
+		pins1 {
+			pinmux = <STM32_PINMUX('F', 7, AF7)>, /* USART7_TX */
+					 <STM32_PINMUX('E', 9, AF7)>; /* USART7_RTS */
+			bias-disable;
+			drive-push-pull;
+			slew-rate = <0>;
+		};
+		pins2 {
+			pinmux = <STM32_PINMUX('E', 7, AF7)>, /* USART7_RX */
+					 <STM32_PINMUX('E',10, AF7)>; /* USART7_CTS */
+			bias-disable;
+		};
+	};
+	
 	/* USER CODE BEGIN pinctrl */
 	ns02_ltdc_pins: ltdc-ns02-0 {
 		pins {
@@ -817,9 +833,17 @@
 	pinctrl-0 = <&uart5_pins_mx>;
 	pinctrl-1 = <&uart5_sleep_pins_mx>;
 	status = "okay";
+};
 
-	/* USER CODE BEGIN uart5 */
-	/* USER CODE END uart5 */
+&uart7{
+	u-boot,dm-pre-reloc;
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart7_pins_mx>;
+	status = "okay";
+
+	rts-gpio = <&gpioi 2 GPIO_ACTIVE_HIGH>;
+	mode-gpio = <&gpiob 10 GPIO_ACTIVE_HIGH>;
+	rxen-gpio = <&gpioi 3 GPIO_ACTIVE_HIGH>;
 };
 
 &usbh_ehci {
