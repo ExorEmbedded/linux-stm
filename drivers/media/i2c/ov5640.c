@@ -84,6 +84,7 @@
 #define OV5640_REG_FRAME_CTRL01		0x4202
 #define OV5640_REG_FORMAT_CONTROL00	0x4300
 #define OV5640_REG_POLARITY_CTRL00	0x4740
+#define OV5640_REG_DATA_ORDER		0x4745 
 #define OV5640_REG_MIPI_CTRL00		0x4800
 #define OV5640_REG_DEBUG_MODE		0x4814
 #define OV5640_REG_ISP_FORMAT_MUX_CTRL	0x501f
@@ -2173,6 +2174,15 @@ static int ov5640_set_framefmt(struct ov5640_dev *sensor,
 	ret = ov5640_write_reg(sensor, OV5640_REG_FORMAT_CONTROL00, val);
 	if (ret)
 		return ret;
+	
+	/* If RGB565 is used, we need to shift datas to D7..0 in stead of D9..2 */	
+	if(is_rgb)
+	{
+		val=0x02;
+		ret = ov5640_write_reg(sensor, OV5640_REG_DATA_ORDER, val);
+		if (ret)
+			return ret;
+	};
 
 	/* FORMAT MUX CONTROL: ISP YUV or RGB */
 	ret = ov5640_write_reg(sensor, OV5640_REG_ISP_FORMAT_MUX_CTRL,
