@@ -156,8 +156,20 @@
 			regulator-min-microvolt = <5000000>;
 			regulator-max-microvolt = <5000000>;
 			regulator-boot-on;
-		};		
-};
+		};
+		
+		v2v8: v2v8reg {
+			compatible = "regulator-fixed";
+			regulator-name = "camera-supply";
+			reg = <3>;
+			regulator-min-microvolt = <2800000>;
+			regulator-max-microvolt = <2800000>;
+			gpio = <&gpiof 12 0>;
+			enable-active-high;
+			regulator-boot-on;
+			regulator-always-on;
+		};
+	};
 
 	panel_rgb: panel-rgb {
 		compatible = "exor,hw_dispid";
@@ -215,6 +227,12 @@
 		};
 
 		clk_hse: clk-hse {
+			clock-frequency = <24000000>;
+		};
+		
+		clk_ext_camera: clk-ext-camera {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
 			clock-frequency = <24000000>;
 		};
 	};
@@ -596,6 +614,48 @@
 					 bias-disable;
 			};
 	};
+
+	dcmi_pins_ns02: dcmi_ns02-0 {
+		pins {
+			pinmux = <STM32_PINMUX('D', 9,  AF13)>,/* DCMI_HSYNC */
+					 <STM32_PINMUX('B', 7,  AF13)>,/* DCMI_VSYNC */
+					 <STM32_PINMUX('C', 2,  AF13)>,/* DCMI_PIXCLK */
+					 <STM32_PINMUX('A', 9,  AF13)>,/* DCMI_D0 */
+					 <STM32_PINMUX('H', 10, AF13)>,/* DCMI_D1 */
+					 <STM32_PINMUX('H', 11, AF13)>,/* DCMI_D2 */
+					 <STM32_PINMUX('E', 1,  AF13)>,/* DCMI_D3 */
+					 <STM32_PINMUX('E', 11, AF13)>,/* DCMI_D4 */
+					 <STM32_PINMUX('D', 3,  AF13)>,/* DCMI_D5 */
+					 <STM32_PINMUX('E', 13, AF13)>,/* DCMI_D6 */
+					 <STM32_PINMUX('I', 7,  AF13)>,/* DCMI_D7 */
+					 <STM32_PINMUX('I', 1,  AF13)>,/* DCMI_D8 */
+					 <STM32_PINMUX('H', 7,  AF13)>,/* DCMI_D9 */
+					 <STM32_PINMUX('D', 6,  AF13)>,/* DCMI_D10 */
+					 <STM32_PINMUX('H', 15, AF13)>;/* DCMI_D11 */
+					 bias-disable;
+			};
+	};
+
+	dcmi_sleep_pins_ns02: dcmi_sleep_ns02-0 {
+		pins {
+			pinmux = <STM32_PINMUX('D', 9,  ANALOG)>,/* DCMI_HSYNC */
+					 <STM32_PINMUX('B', 7,  ANALOG)>,/* DCMI_VSYNC */
+					 <STM32_PINMUX('C', 2,  ANALOG)>,/* DCMI_PIXCLK */
+					 <STM32_PINMUX('A', 9,  ANALOG)>,/* DCMI_D0 */
+					 <STM32_PINMUX('H', 10, ANALOG)>,/* DCMI_D1 */
+					 <STM32_PINMUX('H', 11, ANALOG)>,/* DCMI_D2 */
+					 <STM32_PINMUX('E', 1,  ANALOG)>,/* DCMI_D3 */
+					 <STM32_PINMUX('E', 11, ANALOG)>,/* DCMI_D4 */
+					 <STM32_PINMUX('D', 3,  ANALOG)>,/* DCMI_D5 */
+					 <STM32_PINMUX('E', 13, ANALOG)>,/* DCMI_D6 */
+					 <STM32_PINMUX('I', 7,  ANALOG)>,/* DCMI_D7 */
+					 <STM32_PINMUX('I', 1,  ANALOG)>,/* DCMI_D8 */
+					 <STM32_PINMUX('H', 7,  ANALOG)>,/* DCMI_D9 */
+					 <STM32_PINMUX('D', 6,  ANALOG)>,/* DCMI_D10 */
+					 <STM32_PINMUX('H', 15, ANALOG)>;/* DCMI_D11 */
+					 bias-disable;
+			};
+	};
 	
 	/* USER CODE END pinctrl */
 };
@@ -681,6 +741,28 @@
 	  vcc-supply = <&dac_vcc>;
 	  #io-channel-cells = < 0 >;
 	};	
+	
+	ov5640: camera@3c {
+		compatible = "ovti,ov5640";
+		reg = <0x3c>;
+		clocks = <&clk_ext_camera>;
+		clock-names = "xclk";
+		DOVDD-supply = <&v2v8>;
+		rotation = <180>;
+		status = "okay";
+
+		port {
+			ov5640_0: endpoint {
+				remote-endpoint = <&dcmi_0>;
+				bus-width = <8>;
+				data-shift = <2>; /* lines 9:2 are used */
+				hsync-active = <0>;
+				vsync-active = <0>;
+				pclk-sample = <1>;
+				pclk-max-frequency = <77000000>;
+			};
+		};
+	};
 	
 	/* USER CODE END i2c1 */
 };
@@ -1061,6 +1143,24 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 		compatible = "generic,spidev";
 		reg = <0>;
 		spi-max-frequency = <1000000>;
+	};
+};
+
+&dcmi {
+	status = "okay";
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&dcmi_pins_ns02>;
+	pinctrl-1 = <&dcmi_sleep_pins_ns02>;
+
+	port {
+		dcmi_0: endpoint {
+			remote-endpoint = <&ov5640_0>;
+			bus-width = <8>;
+			hsync-active = <0>;
+			vsync-active = <0>;
+			pclk-sample = <1>;
+			pclk-max-frequency = <77000000>;
+		};
 	};
 };
 /* USER CODE END addons */
