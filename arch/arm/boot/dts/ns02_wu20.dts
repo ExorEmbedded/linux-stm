@@ -561,7 +561,27 @@
 			<STM32_PINMUX('D', 0, ANALOG)>; /* CAN1_RX */
 		};
 	};
+	
+	can1_pins: m_can1-0 {
+		pins1 {
+			pinmux = <STM32_PINMUX('B', 6, AF9)>; /* CAN2_TX */
+			slew-rate = <0>;
+			drive-push-pull;
+			bias-disable;
+		};
+		pins2 {
+			pinmux = <STM32_PINMUX('B', 5, AF9)>; /* CAN2_RX */
+			bias-disable;
+		};
+	};
 
+	can1_pins_sleep: m_can1-1 {
+		pins {
+			pinmux = <STM32_PINMUX('B', 6, ANALOG)>, /* CAN2_TX */
+			<STM32_PINMUX('B', 5, ANALOG)>; /* CAN2_RX */
+		};
+	};
+	
 	spi3_pins_ns02: spi3-0 {
 		pins1 {
 			pinmux = <STM32_PINMUX('E', 0, AF5)>, /* SPI3_SCK */
@@ -1072,11 +1092,19 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 	};
 };
 
-/* can0 */
+/* can 0 */
 &m_can1 {
 	status = "okay";
 	pinctrl-0 = <&can0_pins>;
 	pinctrl-1 = <&can0_pins_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
+/* can 1 */
+&m_can2 {
+	status = "okay";
+	pinctrl-0 = <&can1_pins>;
+	pinctrl-1 = <&can1_pins_sleep>;
 	pinctrl-names = "default", "sleep";
 };
 
