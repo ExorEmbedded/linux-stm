@@ -699,6 +699,35 @@
 	  compatible = "htu21";
 	  reg = <0x40>;
 	};
+
+	pca9633: pca9633 {
+	  compatible = "nxp,pca9633";
+	  #address-cells = <1>;
+	  #size-cells = <0>;
+	  reg = <0x62>;
+
+	    red@0 {
+		    label = "red";
+		    reg = <0>;
+		    linux,default-trigger = "none";
+	      
+	    };
+	    green@1 {
+		    label = "green";
+		    reg = <1>;
+		    linux,default-trigger = "none";
+	    };
+	    blue@2 {
+		    label = "blue";
+		    reg = <2>;
+		    linux,default-trigger = "none";
+	    };
+	    unused@3 {
+		    label = "unused";
+		    reg = <3>;
+		    linux,default-trigger = "none";
+	    };
+	};
 	
 	//TODO: This is just a placeholder, since the ov5640 camera is not used in wu20 design
 	ov5640: camera@3c {
