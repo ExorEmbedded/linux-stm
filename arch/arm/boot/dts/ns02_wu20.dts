@@ -728,6 +728,12 @@
 		    linux,default-trigger = "none";
 	    };
 	};
+
+	lis331dlh@18 {
+	  /* Accelerometer */
+	  compatible = "st,lis331dlh-accel";
+	  reg = <0x18>;
+	};
 	
 	//TODO: This is just a placeholder, since the ov5640 camera is not used in wu20 design
 	ov5640: camera@3c {
