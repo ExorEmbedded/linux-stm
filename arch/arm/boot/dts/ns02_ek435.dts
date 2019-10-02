@@ -208,6 +208,11 @@
 	  pwms = <&pwm5 0 50000 0>;
 	};
 	
+	sound_card {
+		compatible = "audio-graph-card";
+		dais = <&i2s1_port>;
+	};
+	
 	/* USER CODE END root */
 
 	clocks {
@@ -656,8 +661,36 @@
 					 bias-disable;
 			};
 	};
-	
 	/* USER CODE END pinctrl */
+};
+
+&pinctrl_z {
+	/* Audio i2s1 pins */
+	i2s1_pins_a: i2s1-0 {
+		pins1 {
+			pinmux = <STM32_PINMUX('Z', 2, AF5)>, /* I2S1_SDO */
+					 <STM32_PINMUX('Z', 3, AF5)>, /* I2S1_WS */
+					 <STM32_PINMUX('Z', 0, AF5)>, /* I2S1_CK */
+					 <STM32_PINMUX('Z', 6, AF5)>; /* I2S1_MCLK */
+					 slew-rate = <1>;
+					 drive-push-pull;
+					 bias-disable;
+			};
+		pins2 {
+			pinmux = <STM32_PINMUX('Z', 1, AF5)>; /* I2S1_SDI */
+					 bias-disable;
+			};
+	};
+	
+	i2s1_pins_sleep_a: i2s1-1 {
+		pins {
+			pinmux = <STM32_PINMUX('Z', 0, ANALOG)>, 
+					 <STM32_PINMUX('Z', 1, ANALOG)>, 
+					 <STM32_PINMUX('Z', 2, ANALOG)>, 
+					 <STM32_PINMUX('Z', 3, ANALOG)>,
+					 <STM32_PINMUX('Z', 6, ANALOG)>; 
+			};
+	};
 };
 
 &m4_rproc{
@@ -740,7 +773,21 @@
 	  reg = <0x0d>;
 	  vcc-supply = <&dac_vcc>;
 	  #io-channel-cells = < 0 >;
-	};	
+	};
+	
+	codec: wm8960@1a {
+		#sound-dai-cells = <0>;
+		compatible = "wlf,wm8960";
+		reg = <0x1a>;
+//		wlf,shared-lrclk;
+		status = "okay";
+		
+		wm8960_port: port@0 {
+				wm8960_endpoint: endpoint {
+				remote-endpoint = <&i2s1_endpoint>;
+			};
+		};
+	};
 	
 	ov5640: camera@3c {
 		compatible = "ovti,ov5640";
@@ -1160,6 +1207,23 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 			vsync-active = <0>;
 			pclk-sample = <1>;
 			pclk-max-frequency = <77000000>;
+		};
+	};
+};
+
+&i2s1 {
+	clocks = <&rcc SPI1>, <&rcc SPI1_K>, <&rcc PLL3_Q>, <&rcc PLL3_R>;
+	clock-names = "pclk", "i2sclk", "x8k", "x11k";
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&i2s1_pins_a>;
+	pinctrl-1 = <&i2s1_pins_sleep_a>;
+	status = "okay";
+
+	i2s1_port: port {
+		i2s1_endpoint: endpoint {
+			remote-endpoint = <&wm8960_endpoint>;
+			format = "i2s";
+			mclk-fs = <256>;
 		};
 	};
 };
