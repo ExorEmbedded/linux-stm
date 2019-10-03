@@ -195,14 +195,6 @@
 		status = "okay";
 	};
 
-	working_hours {
-	  compatible = "working_hours";
-	  nvmem-names = "eeprom", "rtcnvram";
-	  nvmem = <&seeprom0>, <&m41t83>;
-	  backlight = <&backlight>;
-	  status = "okay";
-	};
-
 	beeper {
 	  compatible = "pwm-beeper";
 	  pwms = <&pwm5 0 50000 0>;
