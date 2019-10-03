@@ -209,6 +209,7 @@
 	};
 	
 	sound_card {
+		label = "ns02 i2s audio";
 		compatible = "audio-graph-card";
 		dais = <&i2s1_port>;
 	};
@@ -785,6 +786,7 @@
 		wm8960_port: port@0 {
 				wm8960_endpoint: endpoint {
 				remote-endpoint = <&i2s1_endpoint>;
+				dai-format = "i2s";
 			};
 		};
 	};
@@ -1223,6 +1225,7 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 		i2s1_endpoint: endpoint {
 			remote-endpoint = <&wm8960_endpoint>;
 			format = "i2s";
+			dai-format = "i2s";
 			mclk-fs = <256>;
 		};
 	};
