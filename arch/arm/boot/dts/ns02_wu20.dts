@@ -748,6 +748,12 @@
 	  reg = <0x40>;
 	};
 
+	lps22hb@5d {
+	    /* Pressure sensor LPS22HB */
+	    compatible = "st,lps22hb-press";
+	    reg = <0x5d>;
+	};
+	
 	pca9633: pca9633 {
 	  compatible = "nxp,pca9633";
 	  #address-cells = <1>;
