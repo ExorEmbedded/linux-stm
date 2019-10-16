@@ -109,23 +109,65 @@
 	};
 	
 	ns02_rst {
-          soft_rst_gpio = <&gpioz 5 GPIO_ACTIVE_HIGH>;
+		soft_rst_gpio = <&gpioz 5 GPIO_ACTIVE_HIGH>;
 	};
 	
 	leds:leds {
 		compatible = "gpio-leds";
         
-        dlled@1 {
-            label = "ns02:dl:usr0";
-            gpios = <&gpiof 13 GPIO_ACTIVE_HIGH>;
-            default-state = "on";
-        };
+		dlled@1 {
+			label = "ns02:dl:usr0";
+			gpios = <&gpiof 13 GPIO_ACTIVE_HIGH>;
+			default-state = "on";
+		};
   
-        faultled@2 {
-            label = "ns02:fault:usr0";
-            gpios = <&gpioz 7 GPIO_ACTIVE_LOW>;
-            default-state = "off";
-        };
+		faultled@2 {
+			label = "ns02:fault:usr0";
+			gpios = <&gpioz 7 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+	};
+
+	gpio_buttons: gpio_buttons@0 {
+		compatible = "gpio-keys";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		button@1 {
+		    label = "L1";
+		    linux,code = <59>; /* KEY_F1 */
+		    gpios = <&gpioe 9 GPIO_ACTIVE_LOW>;
+		};
+
+		button@2 {
+		    label = "L2";
+		    linux,code = <60>; /* KEY_F2 */
+		    gpios = <&gpioe 10 GPIO_ACTIVE_LOW>;
+		};
+
+		button@3 {
+		    label = "L3";
+		    linux,code = <61>; /* KEY_F3 */
+		    gpios = <&gpioe 7 GPIO_ACTIVE_LOW>;
+		};
+
+		button@4 {
+		    label = "L4";
+		    linux,code = <62>; /* KEY_F4 */
+		    gpios = <&gpiof 7 GPIO_ACTIVE_LOW>;
+		};
+
+		button@5 {
+		    label = "L5";
+		    linux,code = <63>; /* KEY_F5 */
+		    gpios = <&gpioa 15 GPIO_ACTIVE_LOW>;
+		};
+
+		button@6 {
+		    label = "L6";
+		    linux,code = <64>; /* KEY_F6 */
+		    gpios = <&gpiob 0 GPIO_ACTIVE_LOW>;
+		};
 	};
 
     regulators {
