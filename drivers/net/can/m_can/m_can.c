@@ -27,6 +27,11 @@
 #include <linux/iopoll.h>
 #include <linux/can/dev.h>
 #include <linux/pinctrl/consumer.h>
+#if defined(CONFIG_CAN_TJA1145) || defined(CONFIG_CAN_TJA1145_MODULE)
+#include <linux/spi/spi.h>
+#include <linux/spi/tja1145.h>
+#endif
+
 
 /* napi related */
 #define M_CAN_NAPI_WEIGHT	64
@@ -368,7 +373,26 @@ struct m_can_priv {
 	/* message ram configuration */
 	void __iomem *mram_base;
 	struct mram_cfg mcfg[MRAM_CFG_NUM];
+
+#if defined(CONFIG_CAN_TJA1145) || defined(CONFIG_CAN_TJA1145_MODULE)
+	struct spi_device* transceiver_client;
+	struct tja1145_functions_accessor*  transceiver_fc;
+	struct work_struct work;
+#endif
 };
+
+#if defined(CONFIG_CAN_TJA1145) || defined(CONFIG_CAN_TJA1145_MODULE)
+static void m_can_plat_work_func(struct work_struct *work)
+{
+	struct m_can_priv *priv = container_of(work, struct m_can_priv, work);
+
+	printk("%s %d\n", __func__, priv->can.bittiming.bitrate );
+#if 0
+	if(priv->transceiver_fc && priv->transceiver_fc->transceiver_change_bitrate)
+		priv->transceiver_fc->transceiver_change_bitrate(priv->transceiver_fc, priv->can.bittiming.bitrate );
+#endif
+}
+#endif
 
 static inline u32 m_can_read(const struct m_can_priv *priv, enum m_can_reg reg)
 {
@@ -1371,6 +1395,22 @@ static int m_can_close(struct net_device *dev)
 	return 0;
 }
 
+static int m_can_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+{
+	struct m_can_priv *priv = netdev_priv(dev);
+	netdev_info(dev, "%s request for new ioctl\n", __func__);
+
+#if defined(CONFIG_CAN_TJA1145) || defined(CONFIG_CAN_TJA1145_MODULE)
+	if(cmd >= SIOCTJA1145SETWAKEUP )
+	{
+		netdev_info(dev, "%s request for new ioctl for can transceiver\n", __func__);
+		if(priv->transceiver_fc && priv->transceiver_fc->transceiver_ioctl)
+			priv->transceiver_fc->transceiver_ioctl(priv->transceiver_fc, ifr, cmd);
+	}
+#endif
+	return 0;
+}
+
 static int m_can_next_echo_skb_occupied(struct net_device *dev, int putidx)
 {
 	struct m_can_priv *priv = netdev_priv(dev);
@@ -1505,6 +1545,7 @@ static const struct net_device_ops m_can_netdev_ops = {
 	.ndo_stop = m_can_close,
 	.ndo_start_xmit = m_can_start_xmit,
 	.ndo_change_mtu = can_change_mtu,
+	.ndo_do_ioctl = m_can_ioctl,
 };
 
 static int register_m_can_dev(struct net_device *dev)
@@ -1582,6 +1623,10 @@ static int m_can_plat_probe(struct platform_device *pdev)
 	struct device_node *np;
 	u32 mram_config_vals[MRAM_CFG_LEN];
 	u32 tx_fifo_size;
+#if defined(CONFIG_CAN_TJA1145) || defined(CONFIG_CAN_TJA1145_MODULE)
+	u32  transceiver_handle = 0;
+	struct device_node* transceiver_node;
+#endif
 
 	np = pdev->dev.of_node;
 
@@ -1650,6 +1695,55 @@ static int m_can_plat_probe(struct platform_device *pdev)
 	}
 
 	priv = netdev_priv(dev);
+
+#if defined(CONFIG_CAN_TJA1145) || defined(CONFIG_CAN_TJA1145_MODULE)
+	priv->transceiver_fc = NULL;
+	/*
+	 * TJA1145 transceiver
+	 */
+	ret = of_property_read_u32(pdev->dev.of_node, "transceiver", &transceiver_handle);
+	if (ret != 0)
+	{
+		dev_info(&pdev->dev, "No managed transceiver found\n");
+	}
+	else
+	{
+		dev_info(&pdev->dev, "Managed transceiver found\n");
+		transceiver_node = of_find_node_by_phandle(transceiver_handle);
+		if (transceiver_node == NULL)
+		{
+			dev_err(&pdev->dev, "Failed to find transceiver node\n");
+			return -ENODEV;
+		}
+
+		priv->transceiver_client = of_find_spi_device_by_node(transceiver_node);
+		if (priv->transceiver_client == NULL)
+		{
+			dev_err(&pdev->dev, "Failed to find spi client\n");
+			of_node_put(transceiver_node);
+			ret = -EPROBE_DEFER;
+			goto exit_free_device;
+		}
+		tja1145_driver_version(priv->transceiver_client);
+		/* release ref to the node and inc reference to the SPI client used */
+		of_node_put(transceiver_node);
+		transceiver_node = NULL;
+
+		/* And now get the TJA1145 function accessor */
+		priv->transceiver_fc = spi_tja1145_get_func_accessor(priv->transceiver_client);
+		if (IS_ERR_OR_NULL(priv->transceiver_fc))
+		{
+			dev_err(&pdev->dev, "Failed to get tja1145 accessor\n");
+			ret = -EPROBE_DEFER;
+			goto exit_free_device;
+		}
+		if( priv->transceiver_fc && priv->transceiver_fc->transceiver_start )
+			priv->transceiver_fc->transceiver_start(priv->transceiver_fc);
+		INIT_WORK(&priv->work, m_can_plat_work_func);
+        dev_info(&pdev->dev, "Tja1145 correctly connected to m_can\n");
+	}
+#endif
+
 	dev->irq = irq;
 	priv->device = &pdev->dev;
 	priv->hclk = hclk;
@@ -1699,6 +1793,11 @@ pm_runtime_fail:
 		free_candev(dev);
 	}
 failed_ret:
+	return ret;
+
+exit_free_device:
+	dev_err(&pdev->dev, "exit_free_device\n");
+	free_candev(dev);
 	return ret;
 }
 
@@ -1754,6 +1853,12 @@ static void unregister_m_can_dev(struct net_device *dev)
 static int m_can_plat_remove(struct platform_device *pdev)
 {
 	struct net_device *dev = platform_get_drvdata(pdev);
+	struct m_can_priv *priv = netdev_priv(dev);
+
+#if defined(CONFIG_CAN_TJA1145) || defined(CONFIG_CAN_TJA1145_MODULE)
+	if( priv->transceiver_fc && priv->transceiver_fc->transceiver_stop )
+		priv->transceiver_fc->transceiver_stop(priv->transceiver_fc);
+#endif
 
 	unregister_m_can_dev(dev);
 

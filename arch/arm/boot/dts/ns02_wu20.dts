@@ -1189,6 +1189,7 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 	pinctrl-0 = <&can0_pins>;
 	pinctrl-1 = <&can0_pins_sleep>;
 	pinctrl-names = "default", "sleep";
+	transceiver = <&tja1145>;
 };
 
 /* can 1 */
@@ -1208,12 +1209,12 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 	cs-gpios = <&gpiof 9 GPIO_ACTIVE_LOW>;
 	/delete-property/dmas;
 	/delete-property/dma-names;
-	
-	
-	spidev0_0: spi3@0 {
-		compatible = "generic,spidev";
+
+	tja1145: tja1145@0 {
+		compatible = "nxp,tja1145";
 		reg = <0>;
-		spi-max-frequency = <1000000>;
+		spi-cpha;
+		spi-max-frequency = <500000>;
 	};
 };
 

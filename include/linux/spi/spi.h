@@ -256,6 +256,7 @@ struct spi_driver {
 	int			(*probe)(struct spi_device *spi);
 	int			(*remove)(struct spi_device *spi);
 	void			(*shutdown)(struct spi_device *spi);
+	int			(*command)(struct spi_device *client, unsigned int cmd, void *arg);
 	struct device_driver	driver;
 };
 
@@ -1309,6 +1310,22 @@ spi_transfer_is_last(struct spi_controller *ctlr, struct spi_transfer *xfer)
 	return list_is_last(&xfer->transfer_list, &ctlr->cur_msg->transfers);
 }
 
+/* OF support code */
+#if IS_ENABLED(CONFIG_OF)
+
+/* must call put_device() when done with returned spi_device device */
+extern struct spi_device *
+of_find_spi_device_by_node(struct device_node *node);
+
+#else
+
+static inline struct spi_device *
+of_find_spi_device_by_node(struct device_node *node)
+{
+	return NULL;
+}
+
+#endif /* IS_ENABLED(CONFIG_OF) */
 
 /* Compatibility layer */
 #define spi_master			spi_controller
