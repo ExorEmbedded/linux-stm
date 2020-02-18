@@ -1572,7 +1572,7 @@ static void m_can_of_parse_mram(struct m_can_priv *priv,
 
 static int m_can_plat_probe(struct platform_device *pdev)
 {
-	struct net_device *dev;
+	struct net_device *dev = NULL;
 	struct m_can_priv *priv;
 	struct resource *res;
 	void __iomem *addr;
@@ -1630,8 +1630,20 @@ static int m_can_plat_probe(struct platform_device *pdev)
 	 */
 	tx_fifo_size = mram_config_vals[7];
 
+	if (pdev->dev.of_node)
+	{
+		int id = of_alias_get_id(pdev->dev.of_node, "can");
+		if (id >= 0)
+		{
+			char name[IFNAMSIZ];
+			snprintf(name, sizeof(name), "can%d", id);
+			dev = alloc_candev_alias(sizeof(*priv), tx_fifo_size, name);
+		}
+	}
+
 	/* allocate the m_can device */
-	dev = alloc_candev(sizeof(*priv), tx_fifo_size);
+	if (!dev)
+		dev = alloc_candev(sizeof(*priv), tx_fifo_size);
 	if (!dev) {
 		ret = -ENOMEM;
 		goto failed_ret;
