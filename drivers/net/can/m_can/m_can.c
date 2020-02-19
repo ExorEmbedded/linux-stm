@@ -387,10 +387,8 @@ static void m_can_plat_work_func(struct work_struct *work)
 	struct m_can_priv *priv = container_of(work, struct m_can_priv, work);
 
 	printk("%s %d\n", __func__, priv->can.bittiming.bitrate );
-#if 0
 	if(priv->transceiver_fc && priv->transceiver_fc->transceiver_change_bitrate)
 		priv->transceiver_fc->transceiver_change_bitrate(priv->transceiver_fc, priv->can.bittiming.bitrate );
-#endif
 }
 #endif
 
@@ -1060,6 +1058,10 @@ static int m_can_set_bittiming(struct net_device *dev)
 		m_can_write(priv, M_CAN_DBTP, reg_btp);
 	}
 
+#if defined(CONFIG_CAN_TJA1145) || defined(CONFIG_CAN_TJA1145_MODULE)
+	schedule_work(&priv->work);
+#endif
+
 	return 0;
 }
 
@@ -1398,12 +1400,12 @@ static int m_can_close(struct net_device *dev)
 static int m_can_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct m_can_priv *priv = netdev_priv(dev);
-	netdev_info(dev, "%s request for new ioctl\n", __func__);
+	netdev_dbg(dev, "%s request for new ioctl\n", __func__);
 
 #if defined(CONFIG_CAN_TJA1145) || defined(CONFIG_CAN_TJA1145_MODULE)
 	if(cmd >= SIOCTJA1145SETWAKEUP )
 	{
-		netdev_info(dev, "%s request for new ioctl for can transceiver\n", __func__);
+		netdev_dbg(dev, "%s request for new ioctl for can transceiver\n", __func__);
 		if(priv->transceiver_fc && priv->transceiver_fc->transceiver_ioctl)
 			priv->transceiver_fc->transceiver_ioctl(priv->transceiver_fc, ifr, cmd);
 	}

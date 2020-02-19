@@ -30,6 +30,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/if.h>
+#include <linux/uaccess.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/tja1145.h>
 
@@ -278,6 +279,7 @@ static void tja1145_set_sleep_WUP_CAN(struct spi_device *spi)
 static void tja1145_configure_wake_can_disable( struct spi_device *spi )
 {
 	dev_dbg(&spi->dev, "%s \n", __func__ );
+	dev_info(&spi->dev, "Setup WakeUp over CAN Disable\n" );
 
 	tja1145_write_single_reg(spi, REG_IDENTIFIER_0,				0x00 );
 	tja1145_write_single_reg(spi, REG_IDENTIFIER_1,				0x00 );
@@ -387,30 +389,33 @@ static void tja1145_ioctl( struct tja1145_functions_accessor *facc, struct ifreq
 {
 	struct tja1145_data* data = container_of(facc, struct tja1145_data, func_acc);
 	struct spi_device*   spi  = data->spi;
+	//struct can_filter __user *cf = ifr->ifr_ifru.ifru_data;
+	struct can_filter __user *cf = ifr->ifr_data;
+	struct can_filter wu_settings;
+
 	dev_dbg(&spi->dev, "%s cmd: 0X%04X\n", __func__, cmd );
-
 	switch (cmd) {
-#if 0
-	case SIOCTJA1145SETWAKEUP:
-		tja1145_configure_wake_can(spi, (struct can_filter*)ifr->ifr_ifru.ifru_data);
-		break;
-#endif
-	case SIOCTJA1145DISWAKEUP:
-	    dev_dbg(&spi->dev, "%s SIOCTJA1145DISWAKEUP\n", __func__ );
-		tja1145_configure_wake_can_disable(spi);
-		break;
-	case SIOCTJA1145NORMALMODE:
-	    dev_dbg(&spi->dev, "%s SIOCTJA1145NORMALMODE\n", __func__ );
-		tja1145_set_working_normal_mode(spi);
-		break;
-	case SIOCTJA1145DUMPREGS:
-	    dev_dbg(&spi->dev, "%s SIOCTJA1145DUMPREGS\n", __func__ );
-		tja1145_dump_all_regs(spi);
-		break;
+		case SIOCTJA1145SETWAKEUP:
+			dev_dbg(&spi->dev, "%s SIOCTJA1145SETWAKEUP\n", __func__ );
+			if( !copy_from_user(&wu_settings, cf, sizeof(wu_settings)) )
+				tja1145_configure_wake_can(spi, &wu_settings);
+			break;
+		case SIOCTJA1145DISWAKEUP:
+			dev_dbg(&spi->dev, "%s SIOCTJA1145DISWAKEUP\n", __func__ );
+			tja1145_configure_wake_can_disable(spi);
+			break;
+		case SIOCTJA1145NORMALMODE:
+			dev_dbg(&spi->dev, "%s SIOCTJA1145NORMALMODE\n", __func__ );
+			tja1145_set_working_normal_mode(spi);
+			break;
+		case SIOCTJA1145DUMPREGS:
+			dev_dbg(&spi->dev, "%s SIOCTJA1145DUMPREGS\n", __func__ );
+			tja1145_dump_all_regs(spi);
+			break;
 
-	default:
-		dev_err(&spi->dev, "%s Unrecognzed ioctl request\n", __func__ );
-		break;
+		default:
+			dev_err(&spi->dev, "%s Unrecognzed ioctl request\n", __func__ );
+			break;
 	}
 }
 
