@@ -85,8 +85,12 @@
  *1.30			SS							11.07.2019	Modified display code #36: for AB19 display 10" G104AGE-L02
  *												Modified display code #39: for AB19 display 15" G150XNE-L01
  *1.31			GP							17.07.2019	Added display code #71 for the TA19 target (same as display code #63 but with 100% max. dimm)
+ *1.32			GP							17.07.2019	Added display code #72: FutureLabs FLC-070DMTK000SA1 800x480 for ex707-HB. Changed max brightness for code #69
+ *1.33			GP							09.01.2020	Changed pwm freq. and min brightness for code #69
+ *1.34			SS							17.01.2020	Changed pwm freq. for code #57
+ *1.35			SS							27.02.2020	Added display code #73: Multi-Inno MI0500AHT-5CP 800x480 for WE20-5inch.
  *
- * NEXT AVAILABLE DISPLAY CODE: 72
+ * NEXT AVAILABLE DISPLAY CODE: 74
  */
  
 #ifndef DISPLAYCONFIG_H
@@ -603,7 +607,7 @@ static struct t_DisplayParams displayconfig[] = {
         
         .blank_inv      = 0,
         
-        .pwmfreq        = 10000,
+        .pwmfreq        = 6000,
         .brightness_min = 1,
         .brightness_max = 80,
     },  
@@ -656,7 +660,7 @@ static struct t_DisplayParams displayconfig[] = {
         .blank_inv      = 0,
         
         .pwmfreq        = 200,
-        .brightness_min = 10,
+        .brightness_min = 1,
         .brightness_max = 100,
     },              
     /* 56: Innolux G156BGE-L01 LVDS 24 bit 1366x768 IMX.6 ONLY */
@@ -707,7 +711,7 @@ static struct t_DisplayParams displayconfig[] = {
         
         .blank_inv      = 0,
         
-        .pwmfreq        = 250,
+        .pwmfreq        = 20000,	//17.01.2020 changed from 250Hz to 20kHz
         .brightness_min = 10,
         .brightness_max = 100,
     },              
@@ -916,7 +920,7 @@ static struct t_DisplayParams displayconfig[] = {
         .blank_inv      = 0,
         
         .pwmfreq        = 10000,  
-        .brightness_min = 10,
+        .brightness_min = 1,
         .brightness_max = 100,
     },   
     /* 66:DISPJST-005N001 800x480 for Jsmart05 */
@@ -1019,9 +1023,9 @@ static struct t_DisplayParams displayconfig[] = {
         
         .blank_inv      = 0,
         
-        .pwmfreq        = 10000,
-        .brightness_min = 10,
-        .brightness_max = 100,
+        .pwmfreq        = 200,
+        .brightness_min = 1,
+        .brightness_max = 85,
     }, 
     /* 70: Innolux G156HCE-L01 DUAL LVDS 24 bit 1920x1080 IMX.6 ONLY*/
     {
@@ -1075,6 +1079,58 @@ static struct t_DisplayParams displayconfig[] = {
         .brightness_min = 10,
         .brightness_max = 100,
     },  
+    /* 72: FutureLabs  FLC-070DMTK000SA1 800x480 ex707-High Brightness IMX.6 ONLY*/
+    {
+        .dispid    = 72,
+        .rezx      = 800, 
+        .rezy      = 480, 
+        .bpp       = 24,
+        
+        .pclk_freq = 29000, 
+        .pclk_inv  = 1,	//21.11.2017 inverted clock polarity due to IMX.6 bug; 
+        
+        .hs_fp     = 60, 
+        .hs_bp     = 32, 
+        .hs_w      = 10, 
+        .hs_inv    = 1,
+        
+        .vs_fp     = 60, 
+        .vs_bp     = 5, 
+        .vs_w      = 10, 
+        .vs_inv    = 1,
+        
+        .blank_inv      = 0,
+        
+        .pwmfreq        = 6000,  
+        .brightness_min = 1, 		/* BSP-1559 : Brightness min=0.08% */
+        .brightness_max = 90,
+    },
+    /* 73: MULTI-INNO MI0500AHT-5CP 800x480 */
+    {
+      .dispid    = 73,
+      .rezx      = 800, 
+      .rezy      = 480, 
+      .bpp       = 16,
+      
+      .pclk_freq = 27000, 
+      .pclk_inv  = 0,
+      
+      .hs_fp     = 48, 
+      .hs_bp     = 48, 
+      .hs_w      = 8, 
+      .hs_inv    = 1,
+      
+      .vs_fp     = 12, 
+      .vs_bp     = 12, 
+      .vs_w      = 8, 
+      .vs_inv    = 1,
+      
+      .blank_inv      = 0,
+      
+      .pwmfreq        = 10000,
+      .brightness_min = 1,
+      .brightness_max = 50,
+    },   
     /* END OF LIST */
     {
       .dispid    = NODISPLAY,
