@@ -596,6 +596,19 @@ config VIDEO_APTINA_PLL
 config VIDEO_SMIAPP_PLL
 	tristate
 
+config VIDEO_EXOR_WE20CAM
+	tristate "Exor WE20 camera support"
+	depends on OF
+	depends on GPIOLIB && VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API
+	depends on MEDIA_CAMERA_SUPPORT
+	select V4L2_FWNODE
+	---help---
+	  This is a Video4Linux2 sensor driver for the Exor
+	  WE20 camera.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called we20cam.
+
 config VIDEO_IMX258
 	tristate "Sony IMX258 sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API

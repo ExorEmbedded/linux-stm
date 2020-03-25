@@ -1347,6 +1347,17 @@ static int adv7180_probe(struct i2c_client *client,
 		state->powered = false;
 	state->input = 0;
 	sd = &state->sd;
+
+	// first reset then initialize the chip
+	ret = init_device(state);
+	if (ret)
+	{
+		v4l_err(client, "error %s %d\n", __FUNCTION__, __LINE__);
+		goto err_free_irq;
+	}
+	// after reset, power up
+	adv7180_write(state, 0x000F, 0x00);
+
 	v4l2_i2c_subdev_init(sd, client, &adv7180_ops);
 	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE | V4L2_SUBDEV_FL_HAS_EVENTS;
 
@@ -1359,10 +1370,7 @@ static int adv7180_probe(struct i2c_client *client,
 	ret = media_entity_pads_init(&sd->entity, 1, &state->pad);
 	if (ret)
 		goto err_free_ctrl;
-
-	ret = init_device(state);
-	if (ret)
-		goto err_media_entity_cleanup;
+	}
 
 	if (state->irq) {
 		ret = request_threaded_irq(client->irq, NULL, adv7180_irq,
@@ -1375,6 +1383,40 @@ static int adv7180_probe(struct i2c_client *client,
 	ret = v4l2_async_register_subdev(sd);
 	if (ret)
 		goto err_free_irq;
+
+	// DVM Exor: adjustments for our hardware
+	adv7180_write(state, 0x0014, 0x11);	// cur src en; color bars
+//	adv7180_write(state, 0x0002, 0x84);	// PAL BGHID
+	adv7180_write(state, 0x0002, 0x04);	// PAL BGHID
+//	adv7180_write(state, 0x008F, 0x50); // llc clock 13.5
+	adv7180_write(state, 0x008F, 0x00); // llc clock 27
+	adv7180_write(state, 0x006A, 0x03); // hsync -> DE
+	adv7180_write(state, 0x006B, 0x11); // vsync -> VS
+//	adv7180_write(state, 0x006A, 0x01); // hsync -> vs
+//	adv7180_write(state, 0x006B, 0x13); // vsync -> de
+//	adv7180_write(state, 0x006A, 0x00); // hsync -> h sync
+//	adv7180_write(state, 0x006B, 0x12); // vsync -> field sync
+
+	adv7180_write(state, 0x0052, 0xCD);	// AFE IBIAS
+//	adv7180_write(state, 0x0000, 0x07);	// INSEL to unconnected input
+//	adv7180_write(state, 0x000C, 0x37);	// force free run
+	adv7180_write(state, 0x0017, 0x41);	// enable SH1
+
+//	adv7180_write(state, 0x000C, 0x34);	// disable free run
+	adv7180_write(state, 0x000C, 0x36);	// enable free run
+	adv7180_write(state, 0x0000, 0x00);	// input 1
+
+//	adv7180_write(state, 0x0031, 0x02); // default vs
+	adv7180_write(state, 0x0031, 0x12); // manual vs
+	adv7180_write(state, 0x0032, 0xC2); // manual vs
+	adv7180_write(state, 0x0033, 0xC4); // manual vs
+	adv7180_write(state, 0x0037, 0x21); // rev vs polarity
+	
+#if 0	// deinterlacer
+	adv7180_vpp_write(state, 0x00A3, 0x00); // ADI required write
+	adv7180_vpp_write(state, 0x005B, 0x00); // enable advanced timing mode
+	adv7180_vpp_write(state, 0x0055, 0x80); // enable deinterlacer
+#endif
 
 	return 0;
 
