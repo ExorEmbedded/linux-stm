@@ -1370,7 +1370,6 @@ static int adv7180_probe(struct i2c_client *client,
 	ret = media_entity_pads_init(&sd->entity, 1, &state->pad);
 	if (ret)
 		goto err_free_ctrl;
-	}
 
 	if (state->irq) {
 		ret = request_threaded_irq(client->irq, NULL, adv7180_irq,
@@ -1410,7 +1409,8 @@ static int adv7180_probe(struct i2c_client *client,
 	adv7180_write(state, 0x0031, 0x12); // manual vs
 	adv7180_write(state, 0x0032, 0xC2); // manual vs
 	adv7180_write(state, 0x0033, 0xC4); // manual vs
-	adv7180_write(state, 0x0037, 0x21); // rev vs polarity
+//	adv7180_write(state, 0x0037, 0x21); // rev vs polarity
+	adv7180_write(state, 0x0037, 0x01); // normal vs polarity
 	
 #if 0	// deinterlacer
 	adv7180_vpp_write(state, 0x00A3, 0x00); // ADI required write
