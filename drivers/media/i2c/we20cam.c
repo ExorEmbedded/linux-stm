@@ -27,6 +27,7 @@
 #include <media/v4l2-device.h>
 #include <media/v4l2-fwnode.h>
 #include <media/v4l2-subdev.h>
+#include <media/i2c/we20cam.h>
 
 enum we20cam_mode_id {
 	WE20CAM_MODE_VGA_640_480,
@@ -74,6 +75,7 @@ struct we20cam_dev {
 	struct v4l2_subdev sd;
 	struct media_pad pad;
 	struct v4l2_fwnode_endpoint ep; /* the parsed DT endpoint info */
+	struct v4l2_ctrl_handler ctrl_hdl;
 
 	/* lock to protect all members below */
 	struct mutex lock;
@@ -357,33 +359,123 @@ out:
 }
 
 /*
- * Sensor Controls.
+ * Controls
+ * 
+ * Handling them here allows us to do some video processing in FPGA,
+ * as well as some in the ADV7280.
+ * 
+ * Currently following are done by FPGA:
+ * - none
+ * 
+ * Following are done by 7280:
+ * - brightness
+ * - contrast
+ * - hue
+ * - saturation
+ * - fast switching
+ * - set input
+ * - set pattern
  */
 
-
-static int we20cam_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
-{
-	return 0;
-}
+extern int adv7180_we20_command(int command, int param1, int param2);
 
 static int we20cam_s_ctrl(struct v4l2_ctrl *ctrl)
 {
-	return 0;
+	return adv7180_we20_command(WE20_CMD_SET_CONTROL, ctrl->id, ctrl->val);
 }
 
 static const struct v4l2_ctrl_ops we20cam_ctrl_ops = {
-	.g_volatile_ctrl = we20cam_g_volatile_ctrl,
 	.s_ctrl = we20cam_s_ctrl,
 };
 
-static const char * const test_pattern_menu[] = {
-	"Disabled",
-	"Color bars",
+static const struct v4l2_ctrl_config we20cam_ctrl_fast_switch = {
+	.ops = &we20cam_ctrl_ops,
+	.id = V4L2_CID_ADV_FAST_SWITCH,
+	.name = "fast_switching",
+	.type = V4L2_CTRL_TYPE_BOOLEAN,
+	.min = 0,
+	.max = 1,
+	.step = 1,
+	.def = 0,
+	.flags = V4L2_CTRL_FLAG_VOLATILE | V4L2_CTRL_FLAG_EXECUTE_ON_WRITE,
 };
+
+static const struct v4l2_ctrl_config we20cam_ctrl_set_input = {
+	.ops = &we20cam_ctrl_ops,
+	.id = V4L2_CID_ADV_SET_INPUT,
+	.name = "set_input",
+	.type = V4L2_CTRL_TYPE_INTEGER,
+	.min = 0,
+	.max = 15,
+	.step = 1,
+	.def = 0,
+	.flags = V4L2_CTRL_FLAG_VOLATILE | V4L2_CTRL_FLAG_EXECUTE_ON_WRITE,
+};
+
+static const struct v4l2_ctrl_config we20cam_ctrl_set_pattern = {
+	.ops = &we20cam_ctrl_ops,
+	.id = V4L2_CID_ADV_SET_PATTERN,
+	.name = "set_pattern",
+	.type = V4L2_CTRL_TYPE_INTEGER,
+	.min = 0,
+	.max = 15,
+	.step = 1,
+	.def = 0,
+	.flags = V4L2_CTRL_FLAG_VOLATILE | V4L2_CTRL_FLAG_EXECUTE_ON_WRITE,
+};
+
+/* Contrast */
+#define ADV7180_CON_MIN		0
+#define ADV7180_CON_DEF		128
+#define ADV7180_CON_MAX		255
+/* Brightness*/
+#define ADV7180_BRI_MIN		-128
+#define ADV7180_BRI_DEF		0
+#define ADV7180_BRI_MAX		127
+/* Hue */
+#define ADV7180_HUE_MIN		-127
+#define ADV7180_HUE_DEF		0
+#define ADV7180_HUE_MAX		128
+/* Saturation */
+#define ADV7180_SAT_MIN		0
+#define ADV7180_SAT_DEF		128
+#define ADV7180_SAT_MAX		255
 
 static int we20cam_init_controls(struct we20cam_dev *sensor)
 {
+	v4l2_ctrl_handler_init(&sensor->ctrl_hdl, 4);
+
+	v4l2_ctrl_new_std(&sensor->ctrl_hdl, &we20cam_ctrl_ops,
+			  V4L2_CID_BRIGHTNESS, ADV7180_BRI_MIN,
+			  ADV7180_BRI_MAX, 1, ADV7180_BRI_DEF);
+	v4l2_ctrl_new_std(&sensor->ctrl_hdl, &we20cam_ctrl_ops,
+			  V4L2_CID_CONTRAST, ADV7180_CON_MIN,
+			  ADV7180_CON_MAX, 1, ADV7180_CON_DEF);
+	v4l2_ctrl_new_std(&sensor->ctrl_hdl, &we20cam_ctrl_ops,
+			  V4L2_CID_SATURATION, ADV7180_SAT_MIN,
+			  ADV7180_SAT_MAX, 1, ADV7180_SAT_DEF);
+	v4l2_ctrl_new_std(&sensor->ctrl_hdl, &we20cam_ctrl_ops,
+			  V4L2_CID_HUE, ADV7180_HUE_MIN,
+			  ADV7180_HUE_MAX, 1, ADV7180_HUE_DEF);
+	v4l2_ctrl_new_custom(&sensor->ctrl_hdl, &we20cam_ctrl_fast_switch, NULL);
+	v4l2_ctrl_new_custom(&sensor->ctrl_hdl, &we20cam_ctrl_set_input, NULL);
+	v4l2_ctrl_new_custom(&sensor->ctrl_hdl, &we20cam_ctrl_set_pattern, NULL);
+
+	sensor->sd.ctrl_handler = &sensor->ctrl_hdl;
+	if (sensor->ctrl_hdl.error) {
+		int err = sensor->ctrl_hdl.error;
+
+		v4l2_ctrl_handler_free(&sensor->ctrl_hdl);
+		return err;
+	}
+	v4l2_ctrl_handler_setup(&sensor->ctrl_hdl);
+
 	return 0;
+}
+
+static void we20cam_exit_controls(struct we20cam_dev *sensor)
+{
+	v4l2_ctrl_handler_free(&sensor->ctrl_hdl);
 }
 
 static int we20cam_enum_frame_size(struct v4l2_subdev *sd,
@@ -615,6 +707,7 @@ static int we20cam_remove(struct i2c_client *client)
 	v4l2_async_unregister_subdev(&sensor->sd);
 	mutex_destroy(&sensor->lock);
 	media_entity_cleanup(&sensor->sd.entity);
+	we20cam_exit_controls(sensor);
 
 	return 0;
 }

@@ -848,12 +848,12 @@
 		clocks = <&clk_ext_camera>;
 		clock-names = "xclk";
 	};
-	
+
 	/* we20 FPGA; most settings taken from ov5640 camera and ignored */
 	/* i2c slave address is placeholder for future use               */
 	we20cam: camera@01 {
 		compatible = "exor,we20cam";
-		reg = <0x01>;	/* main map */
+		reg = <0x01>;
 		clocks = <&clk_ext_camera>;
 		clock-names = "xclk";
 		DOVDD-supply = <&v2v8>;

@@ -28,8 +28,10 @@
 #include <media/v4l2-event.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ctrls.h>
+#include <media/v4l2-fwnode.h>
 #include <linux/mutex.h>
 #include <linux/delay.h>
+#include <media/i2c/we20cam.h>
 
 #define ADV7180_STD_AD_PAL_BG_NTSC_J_SECAM		0x0
 #define ADV7180_STD_AD_PAL_BG_NTSC_J_SECAM_PED		0x1
@@ -187,8 +189,6 @@
 #define ADV7180_DEFAULT_CSI_I2C_ADDR 0x44
 #define ADV7180_DEFAULT_VPP_I2C_ADDR 0x42
 
-#define V4L2_CID_ADV_FAST_SWITCH	(V4L2_CID_USER_ADV7180_BASE + 0x00)
-
 struct adv7180_state;
 
 #define ADV7180_FLAG_RESET_POWERED	BIT(0)
@@ -215,6 +215,7 @@ struct adv7180_state {
 	bool			powered;
 	bool			streaming;
 	u8			input;
+	struct v4l2_fwnode_endpoint ep; /* the parsed DT endpoint info */
 
 	struct i2c_client	*client;
 	unsigned int		register_page;
@@ -539,6 +540,8 @@ static int adv7180_s_power(struct v4l2_subdev *sd, int on)
 	return ret;
 }
 
+static int adv7180_select_input(struct adv7180_state *state, unsigned int input);
+
 static int adv7180_s_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct v4l2_subdev *sd = to_adv7180_sd(ctrl);
@@ -582,6 +585,37 @@ static int adv7180_s_ctrl(struct v4l2_ctrl *ctrl)
 			adv7180_write(state, ADV7180_REG_FLCONTROL, 0x00);
 		}
 		break;
+	case V4L2_CID_ADV_SET_INPUT:
+		ret = adv7180_select_input(state, val);
+		break;
+	case V4L2_CID_ADV_SET_PATTERN:
+		// val bit 3 forces pattern, reg 0x0C bit 0
+		ret = adv7180_read(state, 0x0C);
+		if (val & 0x08)
+		{
+			ret |= 0x01;
+		}
+		else
+		{
+			ret &= ~0x01;
+		}
+		adv7180_write(state, 0x0C, ret);
+		// val bits 2..0 select pattern, reg 0x14 bits 2..0
+		ret = adv7180_read(state, 0x14);
+		ret &= ~0x07;
+		ret |= (val & 0x07);
+		adv7180_write(state, 0x14, ret);
+		// if pattern is luma ramp, recommended color is gray,
+		// otherwise blue is the default
+		if ( (val & 0x07) == 0x02)
+		{
+			adv7180_write(state, 0x0D, 0x88);
+		}
+		else
+		{
+			adv7180_write(state, 0x0D, 0x7C);
+		}
+		break;
 	default:
 		ret = -EINVAL;
 	}
@@ -597,11 +631,34 @@ static const struct v4l2_ctrl_ops adv7180_ctrl_ops = {
 static const struct v4l2_ctrl_config adv7180_ctrl_fast_switch = {
 	.ops = &adv7180_ctrl_ops,
 	.id = V4L2_CID_ADV_FAST_SWITCH,
-	.name = "Fast Switching",
+	.name = "fast_switching",
 	.type = V4L2_CTRL_TYPE_BOOLEAN,
 	.min = 0,
 	.max = 1,
 	.step = 1,
+	.def = 0,
+};
+
+static const struct v4l2_ctrl_config adv7180_ctrl_set_input = {
+	.ops = &adv7180_ctrl_ops,
+	.id = V4L2_CID_ADV_SET_INPUT,
+	.name = "set_input",
+	.type = V4L2_CTRL_TYPE_INTEGER,
+	.min = 0,
+	.max = 15,
+	.step = 1,
+	.def = 0,
+};
+
+static const struct v4l2_ctrl_config adv7180_ctrl_set_pattern = {
+	.ops = &adv7180_ctrl_ops,
+	.id = V4L2_CID_ADV_SET_PATTERN,
+	.name = "set_pattern",
+	.type = V4L2_CTRL_TYPE_INTEGER,
+	.min = 0,
+	.max = 15,
+	.step = 1,
+	.def = 0,
 };
 
 static int adv7180_init_controls(struct adv7180_state *state)
@@ -621,6 +678,8 @@ static int adv7180_init_controls(struct adv7180_state *state)
 			  V4L2_CID_HUE, ADV7180_HUE_MIN,
 			  ADV7180_HUE_MAX, 1, ADV7180_HUE_DEF);
 	v4l2_ctrl_new_custom(&state->ctrl_hdl, &adv7180_ctrl_fast_switch, NULL);
+	v4l2_ctrl_new_custom(&state->ctrl_hdl, &adv7180_ctrl_set_input, NULL);
+	v4l2_ctrl_new_custom(&state->ctrl_hdl, &adv7180_ctrl_set_pattern, NULL);
 
 	state->sd.ctrl_handler = &state->ctrl_hdl;
 	if (state->ctrl_hdl.error) {
@@ -1292,6 +1351,8 @@ out_unlock:
 	return ret;
 }
 
+struct adv7180_state *gp_state = NULL;
+
 static int adv7180_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
@@ -1310,6 +1371,7 @@ static int adv7180_probe(struct i2c_client *client,
 	if (state == NULL)
 		return -ENOMEM;
 
+	gp_state = state;
 	state->client = client;
 	state->field = V4L2_FIELD_ALTERNATE;
 	state->chip_info = (struct adv7180_chip_info *)id->driver_data;
@@ -1384,7 +1446,7 @@ static int adv7180_probe(struct i2c_client *client,
 		goto err_free_irq;
 
 	// DVM Exor: adjustments for our hardware
-	adv7180_write(state, 0x0014, 0x11);	// cur src en; color bars
+	adv7180_write(state, 0x0014, 0x10);	// cur src en, single color pat
 //	adv7180_write(state, 0x0002, 0x84);	// PAL BGHID
 	adv7180_write(state, 0x0002, 0x04);	// PAL BGHID
 //	adv7180_write(state, 0x008F, 0x50); // llc clock 13.5
@@ -1413,6 +1475,7 @@ static int adv7180_probe(struct i2c_client *client,
 	adv7180_write(state, 0x0037, 0x01); // normal vs polarity
 	
 #if 0	// deinterlacer
+// currently disabled because the one in FPGA is better
 	adv7180_vpp_write(state, 0x00A3, 0x00); // ADI required write
 	adv7180_vpp_write(state, 0x005B, 0x00); // enable advanced timing mode
 	adv7180_vpp_write(state, 0x0055, 0x80); // enable deinterlacer
@@ -1454,9 +1517,35 @@ static int adv7180_remove(struct i2c_client *client)
 	adv7180_set_power_pin(state, false);
 
 	mutex_destroy(&state->mutex);
+	gp_state = NULL;
 
 	return 0;
 }
+
+int adv7180_we20_command(int command, int param1, int param2)
+{
+	switch (command)
+	{
+		case WE20_CMD_SET_CONTROL:
+			{
+				struct v4l2_ctrl ctrl =
+				{
+					.handler = &gp_state->ctrl_hdl,
+					.id = param1,
+					.val = param2
+				};
+				return adv7180_s_ctrl(&ctrl);
+			}
+			break;
+			
+		default:
+			return -ENXIO;
+	}
+	
+	return 0;
+}
+
+EXPORT_SYMBOL(adv7180_we20_command);
 
 static const struct i2c_device_id adv7180_id[] = {
 	{ "adv7180", (kernel_ulong_t)&adv7180_info },
