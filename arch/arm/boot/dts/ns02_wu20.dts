@@ -1251,7 +1251,7 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 	flash0: n25q256a@1 {
 		#address-cells = <1>;
 		#size-cells = <1>;
-		compatible = "m25p80";
+		compatible = "jedec,spi-nor";
 		status = "okay";
 		reg = <1>;      /* chip select */
 		spi-max-frequency = <10000000>;
