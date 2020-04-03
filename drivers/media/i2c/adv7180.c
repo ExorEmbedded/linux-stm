@@ -1411,6 +1411,7 @@ static int adv7180_probe(struct i2c_client *client,
 	sd = &state->sd;
 
 	// first reset then initialize the chip
+	v4l_info(client, "resetting ADV7280, i2c bus error expected\n");
 	ret = init_device(state);
 	if (ret)
 	{
