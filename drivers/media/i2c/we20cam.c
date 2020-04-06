@@ -94,7 +94,12 @@ struct we20cam_dev {
 
 	bool pending_mode_change;
 	bool streaming;
+	bool controls_initialized;
 };
+
+#define to_we20cam_sd(_ctrl) (&container_of(_ctrl->handler,		\
+					    struct we20cam_dev,	\
+					    ctrl_hdl)->sd)
 
 static inline struct we20cam_dev *to_we20cam_dev(struct v4l2_subdev *sd)
 {
@@ -381,7 +386,14 @@ extern int adv7180_we20_command(int command, int param1, int param2);
 
 static int we20cam_s_ctrl(struct v4l2_ctrl *ctrl)
 {
-	return adv7180_we20_command(WE20_CMD_SET_CONTROL, ctrl->id, ctrl->val);
+	struct v4l2_subdev *sd = to_we20cam_sd(ctrl);
+	struct we20cam_dev *sensor = to_we20cam_dev(sd);
+	if (sensor->controls_initialized)
+	{
+		return adv7180_we20_command(WE20_CMD_SET_CONTROL, ctrl->id, ctrl->val);
+	}
+
+	return 0;
 }
 
 static const struct v4l2_ctrl_ops we20cam_ctrl_ops = {
@@ -690,6 +702,8 @@ static int we20cam_probe(struct i2c_client *client,
 	if (ret)
 		goto free_ctrls;
 
+	sensor->controls_initialized = true;
+	
 	return 0;
 
 free_ctrls:

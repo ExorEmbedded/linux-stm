@@ -214,6 +214,7 @@ struct adv7180_state {
 	v4l2_std_id		curr_norm;
 	bool			powered;
 	bool			streaming;
+	bool			controls_initialized;
 	u8			input;
 	struct v4l2_fwnode_endpoint ep; /* the parsed DT endpoint info */
 
@@ -224,6 +225,7 @@ struct adv7180_state {
 	const struct adv7180_chip_info *chip_info;
 	enum v4l2_field		field;
 };
+struct adv7180_state *gp_state = NULL;
 #define to_adv7180_sd(_ctrl) (&container_of(_ctrl->handler,		\
 					    struct adv7180_state,	\
 					    ctrl_hdl)->sd)
@@ -1351,8 +1353,6 @@ out_unlock:
 	return ret;
 }
 
-struct adv7180_state *gp_state = NULL;
-
 static int adv7180_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
@@ -1482,6 +1482,8 @@ static int adv7180_probe(struct i2c_client *client,
 	adv7180_vpp_write(state, 0x0055, 0x80); // enable deinterlacer
 #endif
 
+	state->controls_initialized = true;
+	
 	return 0;
 
 err_free_irq:
@@ -1525,22 +1527,25 @@ static int adv7180_remove(struct i2c_client *client)
 
 int adv7180_we20_command(int command, int param1, int param2)
 {
-	switch (command)
+	if (gp_state && gp_state->controls_initialized)
 	{
-		case WE20_CMD_SET_CONTROL:
-			{
-				struct v4l2_ctrl ctrl =
+		switch (command)
+		{
+			case WE20_CMD_SET_CONTROL:
 				{
-					.handler = &gp_state->ctrl_hdl,
-					.id = param1,
-					.val = param2
-				};
-				return adv7180_s_ctrl(&ctrl);
-			}
-			break;
-			
-		default:
-			return -ENXIO;
+					struct v4l2_ctrl ctrl =
+					{
+						.handler = &gp_state->ctrl_hdl,
+						.id = param1,
+						.val = param2
+					};
+					return adv7180_s_ctrl(&ctrl);
+				}
+				break;
+				
+			default:
+				return -ENXIO;
+		}
 	}
 	
 	return 0;
