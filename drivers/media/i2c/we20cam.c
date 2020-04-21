@@ -95,7 +95,11 @@ struct we20cam_dev {
 	bool pending_mode_change;
 	bool streaming;
 	bool controls_initialized;
+	struct device* dev_folder;
 };
+
+#define WE20CAM_GPIO_IN_REG	0x00
+#define WE20CAM_GPIO_OUT_REG	0x01
 
 #define to_we20cam_sd(_ctrl) (&container_of(_ctrl->handler,		\
 					    struct we20cam_dev,	\
@@ -112,35 +116,41 @@ we20cam_mode_data[WE20CAM_NUM_MODES] = {
 	 640, 480},
 };
 
-#if 0	// will be useful when we need to talk to FPGA
-
 static int we20cam_write_reg_device(
 	struct we20cam_dev *sensor,
 	u8 dev_addr,
 	u8 reg,
 	u8 val)
 {
-	struct i2c_client *client = sensor->i2c_client;
-	struct i2c_msg msg;
-	u8 buf[2];
-	int ret;
+	if (sensor->controls_initialized)
+	{
+		struct i2c_client *client = sensor->i2c_client;
+		struct i2c_msg msg;
+		u8 buf[2];
+		int ret;
 
-	buf[0] = reg;
-	buf[1] = val;
+		buf[0] = reg;
+		buf[1] = val;
 
-	msg.addr = dev_addr;
-	msg.flags = client->flags;
-	msg.buf = buf;
-	msg.len = sizeof(buf);
+		msg.addr = dev_addr;
+		msg.flags = client->flags;
+		msg.buf = buf;
+		msg.len = sizeof(buf);
 
-	ret = i2c_transfer(client->adapter, &msg, 1);
-	if (ret < 0) {
-		dev_err(&client->dev, "%s: error: reg=%x, val=%x\n",
-			__func__, reg, val);
-		return ret;
+		/* must use i2c_transfer() here,
+		 * i2c_smbus_write_byte_data() doesn't work
+		 * */
+		ret = i2c_transfer(client->adapter, &msg, 1);
+		if (ret < 0) {
+			dev_err(&client->dev, "%s: error: reg=%x, val=%x\n",
+				__func__, reg, val);
+			return ret;
+		}
+
+		return 0;
 	}
-
-	return 0;
+	
+	return -ENODEV;
 }
 
 static int we20cam_read_reg_device(
@@ -149,46 +159,20 @@ static int we20cam_read_reg_device(
 	u8 reg,
 	u8 *val)
 {
-	struct i2c_client *client = sensor->i2c_client;
-	struct i2c_msg msg[1];
-	u8 buf[1];
-	int ret;
+	if (sensor->controls_initialized)
+	{
+		struct i2c_client *client = sensor->i2c_client;
 
-	buf[0] = reg;
+		/* must use i2c_smbus_read_byte_data() here,
+		 * i2c_transfer() doesn't work
+		 * */
+		*val = i2c_smbus_read_byte_data(client, reg & 0xff);
 
-	msg[0].addr = dev_addr;
-	msg[0].flags = client->flags;
-	msg[0].buf = buf;
-	msg[0].len = sizeof(buf);
-
-	ret = i2c_transfer(client->adapter, msg, 2);
-	if (ret < 0) {
-		dev_err(&client->dev, "%s: error: reg=%x\n",
-			__func__, reg);
-		return ret;
+		return 0;
 	}
-
-	*val = buf[0];
-	return 0;
+	
+	return -ENODEV;
 }
-
-static int we20cam_mod_reg(struct we20cam_dev *sensor, u16 reg,
-			  u8 mask, u8 val)
-{
-	u8 readval;
-	int ret;
-
-	ret = we20cam_read_reg(sensor, reg, &readval);
-	if (ret)
-		return ret;
-
-	readval &= ~mask;
-	val &= mask;
-	val |= readval;
-
-	return we20cam_write_reg(sensor, reg, val);
-}
-#endif
 
 static const struct we20cam_mode_info *
 we20cam_find_mode(struct we20cam_dev *sensor, enum we20cam_frame_rate fr,
@@ -634,6 +618,155 @@ static const struct v4l2_subdev_ops we20cam_subdev_ops = {
 	.pad = &we20cam_pad_ops,
 };
 
+/* sys fs stuff *******************************************************/
+
+/* We provide 2 'files' in /sys/devices/we20cam/ folder:
+ * - gpio_in = 4 inputs
+ * - gpio_out = 4 outputs
+ * 
+ * gpio_in:
+ * - bits 3..0
+ * - read-only
+ * 
+ * gpio_out:
+ * - bits 7..4 = mask, which lower/value bits to use (allows control
+ * of single outputs, instead of always all at once)
+ * - bits 3..0 = values
+ * - read and write
+ * E.g. 0xFF activates all 4 outputs, 0x11 activates only one.
+ * 
+ * Decimal format supported for reading;
+ * decimal, hex and octal for writing.
+ * 
+ * Example:
+ * cat /sys/devices/we20cam/gpio_in
+ * ... will return:
+ * 15 (assuming all inputs are active)
+ * 
+ * If permissions are not appropriate, change them with chmod; here
+ * where the 'files' are created, Linux allows only a limited subset of
+ * permissions to be assigned.
+ * */
+
+/* 4 inputs */
+
+static ssize_t we20cam_gpio_in_show(
+	struct device *dev,
+	struct device_attribute *attr,
+	char *buf)
+{
+	struct we20cam_dev *sensor = dev_get_drvdata(dev);
+	struct i2c_client *client = sensor->i2c_client;
+	int len = 0;
+	u8 value = 0;
+	int ret = we20cam_read_reg_device(
+		sensor,
+		client->addr,
+		WE20CAM_GPIO_IN_REG,
+		&value);
+
+	if (ret)
+	{
+		dev_err(dev, "Error %d reading fpga i2c\n", ret);
+		return -EIO;
+	}
+	
+	len = sprintf(buf, "%u\n", (unsigned int)value);
+	if (len <= 0)
+	{
+		dev_err(dev, "Invalid sprintf len: %d\n", len);
+		return -EINVAL;
+	}
+
+	return len;
+}
+static DEVICE_ATTR(gpio_in, S_IRUGO, we20cam_gpio_in_show, NULL);
+
+/* 4 outputs **********************************************************/
+
+static ssize_t we20cam_gpio_out_show(
+	struct device *dev,
+	struct device_attribute *attr,
+	char *buf)
+{
+	struct we20cam_dev *sensor = dev_get_drvdata(dev);
+	struct i2c_client *client = sensor->i2c_client;
+	int len = 0;
+	u8 value = 0;
+	int ret = we20cam_read_reg_device(
+		sensor,
+		client->addr,
+		WE20CAM_GPIO_OUT_REG,
+		&value);
+
+	if (ret)
+	{
+		dev_err(dev, "Error %d reading fpga i2c\n", ret);
+		return -EIO;
+	}
+	
+	len = sprintf(buf, "%u\n", (unsigned int)value);
+	if (len <= 0)
+	{
+		dev_err(dev, "Invalid sprintf len: %d\n", len);
+		return -EINVAL;
+	}
+
+	return len;
+}
+
+static ssize_t we20cam_gpio_out_store(
+	struct device *dev,
+	struct device_attribute *attr,
+	const char *buf,
+	size_t count)
+{
+	struct we20cam_dev *sensor = dev_get_drvdata(dev);
+	struct i2c_client *client = sensor->i2c_client;
+	unsigned int value = 0;
+	int ret = 0;
+	
+	ret = kstrtouint(buf, 0, &value);
+	if (ret)
+	{
+		dev_err(dev, "Error %d at %s:%d\n", ret, __FUNCTION__, __LINE__);
+		return -EINVAL;
+	}
+	
+	ret = we20cam_write_reg_device(
+		sensor,
+		client->addr,
+		WE20CAM_GPIO_OUT_REG,
+		(u8)value);
+	if (ret)
+	{
+		dev_err(dev, "Error %d writing fpga i2c\n", ret);
+		return -EIO;
+	}
+	
+	return count;
+}
+
+/* cannot assign arbitrary permissions here, if these are not
+ * appropriate, 'chmod' them afterwards.
+ * */
+static DEVICE_ATTR(gpio_out, S_IRUGO | S_IWUSR, we20cam_gpio_out_show, we20cam_gpio_out_store);
+
+static struct attribute *we20cam_attrs[] =
+{
+	&dev_attr_gpio_in.attr,
+	&dev_attr_gpio_out.attr,
+	NULL
+};
+
+static struct attribute_group we20cam_group =
+{
+    .name = NULL, // do not create new folder, we already have one
+    .attrs = we20cam_attrs,
+};
+
+/* probe and remove ***************************************************/
+
 static int we20cam_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
@@ -648,7 +781,7 @@ static int we20cam_probe(struct i2c_client *client,
 		return -ENOMEM;
 
 	sensor->i2c_client = client;
-	
+
 	/*
 	 * default init sequence initialize sensor to
 	 * YUV422 UYVY VGA@30fps
@@ -702,6 +835,19 @@ static int we20cam_probe(struct i2c_client *client,
 	if (ret)
 		goto free_ctrls;
 
+	sensor->dev_folder = root_device_register("we20cam");
+	if (IS_ERR(sensor->dev_folder)) {
+		dev_err(dev, "sysfs folder creation failed\n");
+		goto free_ctrls;
+	}
+	dev_set_drvdata(sensor->dev_folder, sensor);
+	
+	ret = sysfs_create_group(&sensor->dev_folder->kobj, &we20cam_group);
+	if (ret) {
+		dev_err(dev, "sysfs attributes creation failed\n");
+		goto free_ctrls;
+	}
+	
 	sensor->controls_initialized = true;
 	
 	return 0;
@@ -717,7 +863,11 @@ static int we20cam_remove(struct i2c_client *client)
 {
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
 	struct we20cam_dev *sensor = to_we20cam_dev(sd);
+	struct device *dev = &client->dev;
 
+	sysfs_remove_group(&dev->kobj, &we20cam_group);
+	if (sensor->dev_folder)
+		root_device_unregister(sensor->dev_folder);
 	v4l2_async_unregister_subdev(&sensor->sd);
 	mutex_destroy(&sensor->lock);
 	media_entity_cleanup(&sensor->sd.entity);
@@ -742,6 +892,8 @@ static struct i2c_driver we20cam_i2c_driver = {
 	.driver = {
 		.name  = "we20cam",
 		.of_match_table	= we20cam_dt_ids,
+// this is supposedly better way, but it causes driver to crash
+//		.groups = we20cam_groups,
 	},
 	.id_table = we20cam_id,
 	.probe    = we20cam_probe,
@@ -750,5 +902,5 @@ static struct i2c_driver we20cam_i2c_driver = {
 
 module_i2c_driver(we20cam_i2c_driver);
 
-MODULE_DESCRIPTION("WE20CAM MIPI Camera Subdev Driver");
+MODULE_DESCRIPTION("WE20CAM Camera Subdev Driver");
 MODULE_LICENSE("GPL");
