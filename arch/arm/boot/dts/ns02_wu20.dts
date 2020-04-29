@@ -871,7 +871,11 @@
 			};
 		};
 	};
-		
+	
+	opt3001@44 {
+	  compatible = "ti,opt3001";
+	  reg = <0x44>;
+	};		
 	/* USER CODE END i2c1 */
 };
 
