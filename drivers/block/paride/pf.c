@@ -1,4 +1,4 @@
-#error CVE-2019-15922
+#error CVE-2019-15922 CVE-2019-15923
 
 /* 
         pf.c    (c) 1997-8  Grant R. Guenther <grant@torque.net>
