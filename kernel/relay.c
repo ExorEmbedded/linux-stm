@@ -580,7 +580,13 @@ struct rchan *relay_open(const char *base_filename,
 	if (!chan)
 		return NULL;
 
-	chan->buf = alloc_percpu(struct rchan_buf *);
+	chan->buf = alloc_percpu_gfp(struct rchan_buf *,
+				     GFP_KERNEL | __GFP_NOWARN);
+	if (!chan->buf) {
+		kfree(chan);
+		return NULL;
+	}
+
 	chan->version = RELAYFS_CHANNEL_VERSION;
 	chan->n_subbufs = n_subbufs;
 	chan->subbuf_size = subbuf_size;
