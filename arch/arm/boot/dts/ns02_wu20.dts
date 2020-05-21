@@ -620,7 +620,7 @@
 	can0_pins: m_can0-0 {
 		pins1 {
 			pinmux = <STM32_PINMUX('A', 12, AF9)>; /* CAN1_TX */
-			slew-rate = <0>;
+			slew-rate = <1>;
 			drive-push-pull;
 			bias-disable;
 		};
@@ -640,7 +640,7 @@
 	can1_pins: m_can1-0 {
 		pins1 {
 			pinmux = <STM32_PINMUX('B', 6, AF9)>; /* CAN2_TX */
-			slew-rate = <0>;
+			slew-rate = <1>;
 			drive-push-pull;
 			bias-disable;
 		};
