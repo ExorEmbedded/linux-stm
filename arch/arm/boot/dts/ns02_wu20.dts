@@ -129,7 +129,8 @@
 	};
 
 	gpio_buttons: gpio_buttons@0 {
-		compatible = "gpio-keys";
+		compatible = "gpio-keys-polled";
+		poll-interval = <50>;
 		#address-cells = <1>;
 		#size-cells = <0>;
 
