@@ -174,6 +174,97 @@ static int we20cam_read_reg_device(
 	return -ENODEV;
 }
 
+static int we20cam_write_reg32_device(
+	struct we20cam_dev *sensor,
+	u8 dev_addr,
+	u8 reg,
+	u32 val)
+{
+	if (sensor->controls_initialized)
+	{
+		struct i2c_client *client = sensor->i2c_client;
+		struct i2c_msg msg;
+		u8 buf[5];
+		int ret;
+
+		buf[0] = reg;
+		memcpy(&buf[1], &val, 4);
+		//buf[1] = val;
+
+		msg.addr = dev_addr;
+		msg.flags = client->flags;
+		msg.buf = buf;
+		msg.len = sizeof(buf);
+
+		/* must use i2c_transfer() here,
+		 * i2c_smbus_write_byte_data() doesn't work
+		 * */
+		ret = i2c_transfer(client->adapter, &msg, 1);
+		if (ret < 0) {
+			dev_err(&client->dev, "%s: error: reg=%x, val=%x\n",
+				__func__, reg, val);
+			return ret;
+		}
+
+		return 0;
+	}
+	
+	return -ENODEV;
+}
+
+static int we20cam_read_reg32_device(
+	struct we20cam_dev *sensor,
+	u8 dev_addr,
+	u8 reg,
+	u32 *val)
+{
+	if (sensor->controls_initialized)
+	{
+#if 0
+		struct i2c_client *client = sensor->i2c_client;
+
+		/* must use i2c_smbus_read_byte_data() here,
+		 * i2c_transfer() doesn't work
+		 * */
+		*val = i2c_smbus_read_byte_data(client, reg & 0xff);
+#else
+		struct i2c_client *client = sensor->i2c_client;
+		struct i2c_msg msg[2];
+		u8 buf[5];
+		u8 buf2[5];
+		int ret;
+
+		buf[0] = reg;
+		//buf[1] = val;
+
+		msg[0].addr = dev_addr;
+		msg[0].flags = client->flags;
+		msg[0].buf = buf;
+		msg[0].len = 1;
+		msg[1].addr = dev_addr;
+		msg[1].flags = client->flags | I2C_M_RD;
+		msg[1].buf = buf2;
+		msg[1].len = 4;
+
+		/* must use i2c_transfer() here,
+		 * i2c_smbus_write_byte_data() doesn't work
+		 * */
+		ret = i2c_transfer(client->adapter, &msg[0], 2);
+		if (ret < 0) {
+			dev_err(&client->dev, "%s: error: reg=%x, val=%x\n",
+				__func__, reg, *val);
+			return ret;
+		}
+		memcpy(val, &buf2[0], 4);
+
+#endif
+
+		return 0;
+	}
+	
+	return -ENODEV;
+}
+
 static const struct we20cam_mode_info *
 we20cam_find_mode(struct we20cam_dev *sensor, enum we20cam_frame_rate fr,
 		 int width, int height, bool nearest)
@@ -752,10 +843,126 @@ static ssize_t we20cam_gpio_out_store(
  * */
 static DEVICE_ATTR(gpio_out, S_IRUGO | S_IWUSR, we20cam_gpio_out_show, we20cam_gpio_out_store);
 
+/* register **********************************************************/
+
+unsigned int gi_reg = 0;
+
+static ssize_t we20cam_reg_show(
+	struct device *dev,
+	struct device_attribute *attr,
+	char *buf)
+{
+	int len = 0;
+	
+	len = sprintf(buf, "%u\n", (unsigned int)gi_reg);
+	if (len <= 0)
+	{
+		dev_err(dev, "Invalid sprintf len: %d\n", len);
+		return -EINVAL;
+	}
+
+	return len;
+}
+
+static ssize_t we20cam_reg_store(
+	struct device *dev,
+	struct device_attribute *attr,
+	const char *buf,
+	size_t count)
+{
+	int ret = 0;
+	
+	ret = kstrtouint(buf, 0, &gi_reg);
+	if (ret)
+	{
+		dev_err(dev, "Error %d at %s:%d\n", ret, __FUNCTION__, __LINE__);
+		return -EINVAL;
+	}
+	
+	return count;
+}
+
+static DEVICE_ATTR(reg, S_IRUGO | S_IWUSR, we20cam_reg_show, we20cam_reg_store);
+
+/* value **********************************************************/
+
+unsigned int gi_val = 0;
+
+static ssize_t we20cam_val_show(
+	struct device *dev,
+	struct device_attribute *attr,
+	char *buf)
+{
+	struct we20cam_dev *sensor = dev_get_drvdata(dev);
+	struct i2c_client *client = sensor->i2c_client;
+	int len = 0;
+	u32 value = 0;
+	int ret = we20cam_read_reg32_device(
+		sensor,
+		client->addr,
+		gi_reg,
+		&value);
+
+	if (ret)
+	{
+		dev_err(dev, "Error %d reading fpga i2c\n", ret);
+		return -EIO;
+	}
+	
+	len = sprintf(buf, "%u\n", (unsigned int)value);
+	if (len <= 0)
+	{
+		dev_err(dev, "Invalid sprintf len: %d\n", len);
+		return -EINVAL;
+	}
+
+	return len;
+}
+
+static ssize_t we20cam_val_store(
+	struct device *dev,
+	struct device_attribute *attr,
+	const char *buf,
+	size_t count)
+{
+	struct we20cam_dev *sensor = dev_get_drvdata(dev);
+	struct i2c_client *client = sensor->i2c_client;
+	unsigned int value = 0;
+	int ret = 0;
+	
+	ret = kstrtouint(buf, 0, &value);
+	if (ret)
+	{
+		dev_err(dev, "Error %d at %s:%d\n", ret, __FUNCTION__, __LINE__);
+		return -EINVAL;
+	}
+	
+	ret = we20cam_write_reg32_device(
+		sensor,
+		client->addr,
+		gi_reg,
+		(u32)value);
+	if (ret)
+	{
+		dev_err(dev, "Error %d writing fpga i2c\n", ret);
+		return -EIO;
+	}
+	
+	return count;
+}
+
+/* cannot assign arbitrary permissions here, if these are not
+ * appropriate, 'chmod' them afterwards.
+ * */
+static DEVICE_ATTR(val, S_IRUGO | S_IWUSR, we20cam_val_show, we20cam_val_store);
+
+
 static struct attribute *we20cam_attrs[] =
 {
 	&dev_attr_gpio_in.attr,
 	&dev_attr_gpio_out.attr,
+	&dev_attr_reg.attr,
+	&dev_attr_val.attr,
 	NULL
 };
 
@@ -849,7 +1056,7 @@ static int we20cam_probe(struct i2c_client *client,
 	}
 	
 	sensor->controls_initialized = true;
-	
+		
 	return 0;
 
 free_ctrls:
