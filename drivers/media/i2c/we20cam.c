@@ -31,6 +31,7 @@
 
 enum we20cam_mode_id {
 	WE20CAM_MODE_640_480,
+	WE20CAM_MODE_480_480,
 	WE20CAM_MODE_320_480,
 	WE20CAM_NUM_MODES,
 };
@@ -114,6 +115,7 @@ static inline struct we20cam_dev *to_we20cam_dev(struct v4l2_subdev *sd)
 static const struct we20cam_mode_info
 we20cam_mode_data[WE20CAM_NUM_MODES] = {
 	{WE20CAM_MODE_640_480, 640, 480},
+	{WE20CAM_MODE_640_480, 480, 480},
 	{WE20CAM_MODE_320_480, 320, 480}
 };
 
