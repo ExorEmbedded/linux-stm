@@ -252,7 +252,6 @@
 	dig_io:dig_io {
 		compatible = "exor,gpio_initializer";
 		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_dig_io>;
 
 		gpios = <&gpioe 5  0x21>, <&gpioe 12 0x21>, <&gpioe 4 0x21>, <&gpiog 12 0x21>, <&gpioa 3 0x21>,  <&gpiob 1 0x21>,
 				<&gpiod 12 0x20>, <&gpiod 14 0x20>, <&gpioe 6 0x20>, <&gpioh 8 0x20>,  <&gpiod 15 0x20>, <&gpioh 2 0x20>;
