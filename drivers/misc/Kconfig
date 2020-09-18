@@ -518,6 +518,13 @@ config WORKING_HOURS
 	depends on EEPROM_AT24 && BACKLIGHT_PWM
 	help
 	    Say Y to add working hours counters in I2C EEPROM.
+
+config EXGPIO_INIT
+	tristate "Exor GPIO initializer, based on dtb"
+	depends on OF
+	help
+	  Say Y to add support for initializing gpio lines through dtb.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
