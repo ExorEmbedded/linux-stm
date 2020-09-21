@@ -30,7 +30,9 @@
 #include <media/i2c/we20cam.h>
 
 enum we20cam_mode_id {
-	WE20CAM_MODE_VGA_640_480,
+	WE20CAM_MODE_640_480,
+	WE20CAM_MODE_480_480,
+	WE20CAM_MODE_320_480,
 	WE20CAM_NUM_MODES,
 };
 
@@ -112,8 +114,9 @@ static inline struct we20cam_dev *to_we20cam_dev(struct v4l2_subdev *sd)
 
 static const struct we20cam_mode_info
 we20cam_mode_data[WE20CAM_NUM_MODES] = {
-	{WE20CAM_MODE_VGA_640_480,
-	 640, 480},
+	{WE20CAM_MODE_640_480, 640, 480},
+	{WE20CAM_MODE_640_480, 480, 480},
+	{WE20CAM_MODE_320_480, 320, 480}
 };
 
 static int we20cam_write_reg_device(
@@ -177,19 +180,22 @@ static int we20cam_read_reg_device(
 static int we20cam_write_reg32_device(
 	struct we20cam_dev *sensor,
 	u8 dev_addr,
-	u8 reg,
+	u16 reg,
 	u32 val)
 {
 	if (sensor->controls_initialized)
 	{
 		struct i2c_client *client = sensor->i2c_client;
 		struct i2c_msg msg;
-		u8 buf[5];
+		u8 regbuf[2];
+		u8 buf[6];
 		int ret;
 
-		buf[0] = reg;
-		memcpy(&buf[1], &val, 4);
-		//buf[1] = val;
+		memcpy(&regbuf[0], &reg, 2);
+		buf[0] = regbuf[1];
+		buf[1] = regbuf[0];
+	
+		memcpy(&buf[2], &val, 4);
 
 		msg.addr = dev_addr;
 		msg.flags = client->flags;
@@ -215,32 +221,27 @@ static int we20cam_write_reg32_device(
 static int we20cam_read_reg32_device(
 	struct we20cam_dev *sensor,
 	u8 dev_addr,
-	u8 reg,
+	u16 reg,
 	u32 *val)
 {
 	if (sensor->controls_initialized)
 	{
-#if 0
-		struct i2c_client *client = sensor->i2c_client;
-
-		/* must use i2c_smbus_read_byte_data() here,
-		 * i2c_transfer() doesn't work
-		 * */
-		*val = i2c_smbus_read_byte_data(client, reg & 0xff);
-#else
 		struct i2c_client *client = sensor->i2c_client;
 		struct i2c_msg msg[2];
+		u8 bufreg[2];
 		u8 buf[5];
 		u8 buf2[5];
 		int ret;
 
-		buf[0] = reg;
+		memcpy(bufreg, &reg, 2);
+		buf[0] = bufreg[1];
+		buf[1] = bufreg[0];
 		//buf[1] = val;
 
 		msg[0].addr = dev_addr;
 		msg[0].flags = client->flags;
 		msg[0].buf = buf;
-		msg[0].len = 1;
+		msg[0].len = 2;
 		msg[1].addr = dev_addr;
 		msg[1].flags = client->flags | I2C_M_RD;
 		msg[1].buf = buf2;
@@ -256,8 +257,6 @@ static int we20cam_read_reg32_device(
 			return ret;
 		}
 		memcpy(val, &buf2[0], 4);
-
-#endif
 
 		return 0;
 	}
@@ -909,7 +908,7 @@ static ssize_t we20cam_val_show(
 		return -EIO;
 	}
 	
-	len = sprintf(buf, "%u\n", (unsigned int)value);
+	len = sprintf(buf, "0x%x\n", (unsigned int)value);
 	if (len <= 0)
 	{
 		dev_err(dev, "Invalid sprintf len: %d\n", len);
@@ -1006,7 +1005,7 @@ static int we20cam_probe(struct i2c_client *client,
 	sensor->frame_interval.denominator = we20cam_framerates[WE20CAM_30_FPS];
 	sensor->current_fr = WE20CAM_30_FPS;
 	sensor->current_mode =
-		&we20cam_mode_data[WE20CAM_MODE_VGA_640_480];
+		&we20cam_mode_data[WE20CAM_MODE_640_480];
 	sensor->last_mode = sensor->current_mode;
 
 	endpoint = fwnode_graph_get_next_endpoint(dev_fwnode(&client->dev),

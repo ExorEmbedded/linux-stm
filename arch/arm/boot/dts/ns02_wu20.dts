@@ -237,16 +237,27 @@
 	};
 
 	working_hours {
-	  compatible = "working_hours";
-	  nvmem-names = "eeprom", "rtcnvram";
-	  nvmem = <&seeprom0>, <&m41t83>;
-	  backlight = <&backlight>;
-	  status = "okay";
+		compatible = "working_hours";
+		nvmem-names = "eeprom", "rtcnvram";
+		nvmem = <&seeprom0>, <&m41t83>;
+		backlight = <&backlight>;
+		status = "okay";
 	};
 
 	beeper {
-	  compatible = "pwm-beeper";
-	  pwms = <&pwm5 0 50000 0>;
+		compatible = "pwm-beeper";
+		pwms = <&pwm5 0 50000 0>;
+	};
+
+	dig_io:dig_io {
+		compatible = "exor,gpio_initializer";
+		pinctrl-names = "default";
+
+		gpios = <&gpioe 5  0x21>, <&gpioe 12 0x21>, <&gpioe 4 0x21>, <&gpiog 12 0x21>, <&gpioa 3 0x21>,  <&gpiob 1 0x21>,
+				<&gpiod 12 0x20>, <&gpiod 14 0x20>, <&gpioe 6 0x20>, <&gpioh 8 0x20>,  <&gpiod 15 0x20>, <&gpioh 2 0x20>;
+
+		gpio-names = "flt12", "flt34", "in1", "in2", "in3", "in4",
+					 "en12", "en34", "out1", "out2", "out3", "out4";
 	};
 	
 	/* USER CODE END root */
