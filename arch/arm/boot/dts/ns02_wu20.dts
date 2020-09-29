@@ -1045,9 +1045,12 @@
 
 	/* USER CODE BEGIN sdmmc2 */
 	non-removable;
+	no-sd;
+	no-sdio;
 	st,neg-edge;
 	bus-width = <8>;
 	vmmc-supply = <&v3v3>;
+	mmc-ddr-3_3v;
 	keep-power-in-suspend;
 	/* USER CODE END sdmmc2 */
 };
