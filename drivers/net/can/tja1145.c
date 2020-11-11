@@ -90,6 +90,7 @@ static u8 regs_list[] = {
 	REG_IDENTIFICATION
 };
 
+static void tja1145_set_working_normal_mode( struct spi_device *spi );
 /*
  * tja1145_driver_version --> guard function
  */
@@ -352,6 +353,8 @@ static void tja1145_configure_wake_can( struct spi_device *spi, struct can_filte
 			 (wu_settings->can_id & CAN_EFF_FLAG) ? "Extended" : "Standard", \
 			 (wu_settings->can_id & CAN_EFF_MASK), wu_settings->can_mask );
 
+	tja1145_set_working_normal_mode(spi);
+
 	if(wu_settings->can_id &  CAN_EFF_FLAG)
 		tja1145_configure_wake_can_extendedId(spi, wu_settings);
 	else
@@ -393,7 +396,6 @@ static void tja1145_ioctl( struct tja1145_functions_accessor *facc, struct ifreq
 	struct can_filter __user *cf = ifr->ifr_data;
 	struct can_filter wu_settings;
 
-	dev_dbg(&spi->dev, "%s cmd: 0X%04X\n", __func__, cmd );
 	switch (cmd) {
 		case SIOCTJA1145SETWAKEUP:
 			dev_dbg(&spi->dev, "%s SIOCTJA1145SETWAKEUP\n", __func__ );
@@ -590,3 +592,4 @@ module_spi_driver(tja1145_spi_driver);
 MODULE_AUTHOR("Luigi Scagnet <luigi.scagnet@exorint.it>, ");
 MODULE_DESCRIPTION("NXP TJA1145 CAN transceiver driver");
 MODULE_LICENSE("GPL");
+/* vim: set noexpandtab tabstop=4 shiftwidth=4: */
