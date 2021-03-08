@@ -85,6 +85,7 @@
 		ethernet0 = &ethernet0;
 		spi0 = &spi3;
 		spi1 = &spi5;
+		spi2 = &spi2;
 		mmc0 = &sdmmc1;
 		mmc1 = &sdmmc2;
 		can0 = &m_can1;
@@ -697,6 +698,21 @@
 			};
 	};
 
+
+	spi2_pins_ns02: spi2-0 {
+		pins1 {
+			pinmux = <STM32_PINMUX('B',10, AF5)>, /* SPI2_SCK */
+					 <STM32_PINMUX('I', 3, AF5)>; /* SPI2_MOSI */
+                     bias-disable;
+                     drive-push-pull;
+                     slew-rate = <1>;
+		};
+		pins2 {
+				 pinmux = <STM32_PINMUX('I', 2, AF5)>; /* SPI2_MISO */
+				 bias-disable;
+		};
+	};	
+	
 	dcmi_pins_ns02: dcmi_ns02-0 {
 		pins {
 			pinmux = <STM32_PINMUX('D', 9,  AF13)>,/* DCMI_HSYNC */
@@ -1282,6 +1298,25 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 		cdns,tchsh-ns = <4>;
 		cdns,tslch-ns = <4>;
 	};
+};
+
+&spi2 {
+	status = "okay";
+
+	pinctrl-0 = <&spi2_pins_ns02>;
+	pinctrl-names = "default";
+	cs-gpios = <&gpioe 8 GPIO_ACTIVE_LOW>;
+	/delete-property/dmas;
+	/delete-property/dma-names;
+
+    fram: at25@3 {
+        compatible = "atmel,at25", "st,m95256";
+        reg = <0>;
+        spi-max-frequency = <20000000>;
+        pagesize = <64>;
+        size = <65536>;
+        address-width = <16>;
+    };	
 };
 
 &dcmi {
