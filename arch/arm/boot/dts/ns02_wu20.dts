@@ -709,7 +709,7 @@
 		};
 		pins2 {
 				 pinmux = <STM32_PINMUX('I', 2, AF5)>; /* SPI2_MISO */
-				 bias-disable;
+				 bias-pull-up;
 		};
 	};	
 	
