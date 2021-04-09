@@ -98,10 +98,42 @@ struct we20cam_dev {
 	bool streaming;
 	bool controls_initialized;
 	struct device* dev_folder;
+
+	u32 i_fpga_control_register;
+	u32 i_fpga_width;
+	u32 i_fpga_height;
+	u32 i_fpga_rotation;
+	u32 i_fpga_mirror_horizontal;
+	u32 i_fpga_mirror_vertical;
 };
 
 #define WE20CAM_GPIO_IN_REG	0x00
 #define WE20CAM_GPIO_OUT_REG	0x01
+#define FPGA_ROTATION_CONTROL_REG	0x80
+#define FPGA_SCALER_CONTROL_REG	0x200
+#define FPGA_SCALER_WIDTH_REG	0x20C
+#define FPGA_SCALER_HEIGHT_REG	0x210
+#define FPGA_CLOCKED_VIDEO_OUTPUT_CONTROL_REG	0x400
+#define FPGA_CLIPPER_CONTROL_REG	0x4000
+#define FPGA_CLIPPER_WIDTH_REG	0x4004
+#define FPGA_CLIPPER_HEIGHT_REG	0x4008
+#define FPGA_CLIPPER_BLANKING_WIDTH_REG	0x400C
+#define FPGA_CLIPPER_BLANKING_HEIGHT_REG	0x4010
+
+#define DEFAULT_WIDTH	640
+#define DEFAULT_HEIGHT	480
+
+#define FPGA_ROTATION_ENABLE	0x1
+#define FPGA_ROTATION_ANGLE_MASK	( (1<<2) | (1<<1) )
+#define FPGA_SCALER_DISABLE	0x0
+#define FPGA_SCALER_ENABLE	0x1
+#define FPGA_MIRROR_HORIZONTAL_ENABLE	(1 << 3)
+#define FPGA_MIRROR_VERTICAL_ENABLE	(1 << 4)
+#define FPGA_CLIPPER_DISABLE	0x0
+#define FPGA_CLIPPER_ENABLE	0x1
+#define FPGA_CLIPPER_PASS_THROUGH	0x2
+#define FPGA_CVO_DISABLE	0x0
+#define FPGA_CVO_ENABLE	0x1
 
 #define to_we20cam_sd(_ctrl) (&container_of(_ctrl->handler,		\
 					    struct we20cam_dev,	\
@@ -740,7 +772,7 @@ static const struct v4l2_subdev_ops we20cam_subdev_ops = {
 
 /* 4 inputs */
 
-static ssize_t we20cam_gpio_in_show(
+static ssize_t exor_camera_gpio_in_show(
 	struct device *dev,
 	struct device_attribute *attr,
 	char *buf)
@@ -770,11 +802,11 @@ static ssize_t we20cam_gpio_in_show(
 
 	return len;
 }
-static DEVICE_ATTR(gpio_in, S_IRUGO, we20cam_gpio_in_show, NULL);
+static DEVICE_ATTR(gpio_in, S_IRUGO, exor_camera_gpio_in_show, NULL);
 
 /* 4 outputs **********************************************************/
 
-static ssize_t we20cam_gpio_out_show(
+static ssize_t exor_camera_gpio_out_show(
 	struct device *dev,
 	struct device_attribute *attr,
 	char *buf)
@@ -805,7 +837,7 @@ static ssize_t we20cam_gpio_out_show(
 	return len;
 }
 
-static ssize_t we20cam_gpio_out_store(
+static ssize_t exor_camera_gpio_out_store(
 	struct device *dev,
 	struct device_attribute *attr,
 	const char *buf,
@@ -840,13 +872,13 @@ static ssize_t we20cam_gpio_out_store(
 /* cannot assign arbitrary permissions here, if these are not
  * appropriate, 'chmod' them afterwards.
  * */
-static DEVICE_ATTR(gpio_out, S_IRUGO | S_IWUSR, we20cam_gpio_out_show, we20cam_gpio_out_store);
+static DEVICE_ATTR(gpio_out, S_IRUGO | S_IWUSR, exor_camera_gpio_out_show, exor_camera_gpio_out_store);
 
 /* register **********************************************************/
 
 unsigned int gi_reg = 0;
 
-static ssize_t we20cam_reg_show(
+static ssize_t exor_camera_reg_show(
 	struct device *dev,
 	struct device_attribute *attr,
 	char *buf)
@@ -863,7 +895,7 @@ static ssize_t we20cam_reg_show(
 	return len;
 }
 
-static ssize_t we20cam_reg_store(
+static ssize_t exor_camera_reg_store(
 	struct device *dev,
 	struct device_attribute *attr,
 	const char *buf,
@@ -881,13 +913,13 @@ static ssize_t we20cam_reg_store(
 	return count;
 }
 
-static DEVICE_ATTR(reg, S_IRUGO | S_IWUSR, we20cam_reg_show, we20cam_reg_store);
+static DEVICE_ATTR(reg, S_IRUGO | S_IWUSR, exor_camera_reg_show, exor_camera_reg_store);
 
 /* value **********************************************************/
 
 unsigned int gi_val = 0;
 
-static ssize_t we20cam_val_show(
+static ssize_t exor_camera_val_show(
 	struct device *dev,
 	struct device_attribute *attr,
 	char *buf)
@@ -918,7 +950,7 @@ static ssize_t we20cam_val_show(
 	return len;
 }
 
-static ssize_t we20cam_val_store(
+static ssize_t exor_camera_val_store(
 	struct device *dev,
 	struct device_attribute *attr,
 	const char *buf,
@@ -953,15 +985,326 @@ static ssize_t we20cam_val_store(
 /* cannot assign arbitrary permissions here, if these are not
  * appropriate, 'chmod' them afterwards.
  * */
-static DEVICE_ATTR(val, S_IRUGO | S_IWUSR, we20cam_val_show, we20cam_val_store);
+static DEVICE_ATTR(val, S_IRUGO | S_IWUSR, exor_camera_val_show, exor_camera_val_store);
 
+static void fpga_enable_all(struct we20cam_dev *sensor, const bool b_enable)
+{
+	int ret = 0;
+
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_SCALER_CONTROL_REG,
+		b_enable ? FPGA_SCALER_ENABLE : FPGA_SCALER_DISABLE);
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_CLIPPER_CONTROL_REG,
+		b_enable ? FPGA_SCALER_ENABLE : FPGA_SCALER_DISABLE);
+
+	if (b_enable)
+		sensor->i_fpga_control_register |= FPGA_ROTATION_ENABLE;
+	else
+		sensor->i_fpga_control_register &= ~FPGA_ROTATION_ENABLE;
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_ROTATION_CONTROL_REG,
+		sensor->i_fpga_control_register);
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_CLOCKED_VIDEO_OUTPUT_CONTROL_REG,
+		b_enable ? FPGA_CVO_ENABLE : FPGA_CVO_DISABLE);
+
+}
+
+static ssize_t exor_camera_width_show(
+	struct device* dev,
+	struct device_attribute* attr,
+	char* buf)
+{
+	struct we20cam_dev *sensor = dev_get_drvdata(dev);
+	int len = 0;
+
+	len = sprintf(buf, "%d\n", sensor->i_fpga_width);
+	if (len <= 0)
+	{
+		dev_err(dev, "Invalid sprintf len: %d\n", len);
+		return -EINVAL;
+	}
+
+	return len;
+}
+
+static ssize_t exor_camera_width_store(
+	struct device* dev,
+	struct device_attribute* attr,
+	const char* buf,
+	size_t count)
+{
+	struct we20cam_dev *sensor = dev_get_drvdata(dev);
+	int ret = 0;
+
+	ret = kstrtouint(buf, 0, &sensor->i_fpga_width);
+	if (ret)
+	{
+		dev_err(dev, "Error %d at %s:%d\n", ret, __FUNCTION__, __LINE__);
+		return -EINVAL;
+	}
+
+	fpga_enable_all(sensor, false);
+
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_SCALER_WIDTH_REG,
+		sensor->i_fpga_width);
+
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_CLIPPER_WIDTH_REG,
+		sensor->i_fpga_width);
+	usleep_range(10 * 1000, 20 * 1000);
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_CLIPPER_BLANKING_WIDTH_REG,
+		DEFAULT_WIDTH - sensor->i_fpga_width);
+	usleep_range(10 * 1000, 20 * 1000);
+
+//	fpga_enable_all(state, true);
+
+	return count;
+}
+
+static ssize_t exor_camera_height_show(
+	struct device* dev,
+	struct device_attribute* attr,
+	char* buf)
+{
+	struct we20cam_dev *sensor = dev_get_drvdata(dev);
+	int len = 0;
+
+	len = sprintf(buf, "%d\n", sensor->i_fpga_height);
+	if (len <= 0)
+	{
+		dev_err(dev, "Invalid sprintf len: %d\n", len);
+		return -EINVAL;
+	}
+
+	return len;
+}
+
+static ssize_t exor_camera_height_store(
+	struct device* dev,
+	struct device_attribute* attr,
+	const char* buf,
+	size_t count)
+{
+	struct we20cam_dev *sensor = dev_get_drvdata(dev);
+	int ret = 0;
+
+	ret = kstrtouint(buf, 0, &sensor->i_fpga_height);
+	if (ret)
+	{
+		dev_err(dev, "Error %d at %s:%d\n", ret, __FUNCTION__, __LINE__);
+		return -EINVAL;
+	}
+
+//	fpga_enable_all(state, false);
+
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_SCALER_HEIGHT_REG,
+		sensor->i_fpga_height);
+
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_CLIPPER_HEIGHT_REG,
+		sensor->i_fpga_height);
+	usleep_range(10 * 1000, 20 * 1000);
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_CLIPPER_BLANKING_HEIGHT_REG,
+		DEFAULT_HEIGHT - sensor->i_fpga_height);
+	usleep_range(10 * 1000, 20 * 1000);
+
+	fpga_enable_all(sensor, true);
+
+	return count;
+}
+
+static ssize_t exor_camera_rotation_show(
+	struct device* dev,
+	struct device_attribute* attr,
+	char* buf)
+{
+	struct we20cam_dev *sensor = dev_get_drvdata(dev);
+	int len = 0;
+
+	len = sprintf(buf, "%d\n", sensor->i_fpga_rotation);
+	if (len <= 0)
+	{
+		dev_err(dev, "Invalid sprintf len: %d\n", len);
+		return -EINVAL;
+	}
+
+	return len;
+}
+
+static ssize_t exor_camera_rotation_store(
+	struct device* dev,
+	struct device_attribute* attr,
+	const char* buf,
+	size_t count)
+{
+	struct we20cam_dev *sensor = dev_get_drvdata(dev);
+	int ret = 0;
+
+	ret = kstrtouint(buf, 0, &sensor->i_fpga_rotation);
+	if (ret)
+	{
+		dev_err(dev, "Error %d at %s:%d\n", ret, __FUNCTION__, __LINE__);
+		return -EINVAL;
+	}
+
+	fpga_enable_all(sensor, false);
+
+	sensor->i_fpga_control_register &= ~FPGA_ROTATION_ANGLE_MASK;
+	switch (sensor->i_fpga_rotation)
+	{
+	case 0: sensor->i_fpga_control_register |= (0x0 << 1); break;
+	case 90: sensor->i_fpga_control_register |= (0x1 << 1); break;
+	case 180: sensor->i_fpga_control_register |= (0x2 << 1); break;
+	case 270: sensor->i_fpga_control_register |= (0x3 << 1); break;
+	default: sensor->i_fpga_control_register |= (0x0 << 1); break;
+	}
+	
+	fpga_enable_all(sensor, true);
+
+	return count;
+}
+
+static ssize_t exor_camera_mirror_horizontal_show(
+	struct device* dev,
+	struct device_attribute* attr,
+	char* buf)
+{
+	struct we20cam_dev *sensor = dev_get_drvdata(dev);
+	int len = 0;
+
+	len = sprintf(buf, "%d\n", sensor->i_fpga_mirror_horizontal);
+	if (len <= 0)
+	{
+		dev_err(dev, "Invalid sprintf len: %d\n", len);
+		return -EINVAL;
+	}
+
+	return len;
+}
+
+static ssize_t exor_camera_mirror_horizontal_store(
+	struct device* dev,
+	struct device_attribute* attr,
+	const char* buf,
+	size_t count)
+{
+	struct we20cam_dev *sensor = dev_get_drvdata(dev);
+	int ret = 0;
+
+	ret = kstrtouint(buf, 0, &sensor->i_fpga_mirror_horizontal);
+	if (ret)
+	{
+		dev_err(dev, "Error %d at %s:%d\n", ret, __FUNCTION__, __LINE__);
+		return -EINVAL;
+	}
+
+	fpga_enable_all(sensor, false);
+
+	if (sensor->i_fpga_mirror_horizontal)
+	{
+		sensor->i_fpga_control_register |= FPGA_MIRROR_HORIZONTAL_ENABLE;
+	}
+	else
+	{
+		sensor->i_fpga_control_register &= ~FPGA_MIRROR_HORIZONTAL_ENABLE;
+	}
+	fpga_enable_all(sensor, true);
+
+	return count;
+}
+
+static ssize_t exor_camera_mirror_vertical_show(
+	struct device* dev,
+	struct device_attribute* attr,
+	char* buf)
+{
+	struct we20cam_dev *sensor = dev_get_drvdata(dev);
+	int len = 0;
+
+	len = sprintf(buf, "%d\n", sensor->i_fpga_mirror_vertical);
+	if (len <= 0)
+	{
+		dev_err(dev, "Invalid sprintf len: %d\n", len);
+		return -EINVAL;
+	}
+
+	return len;
+}
+
+static ssize_t exor_camera_mirror_vertical_store(
+	struct device* dev,
+	struct device_attribute* attr,
+	const char* buf,
+	size_t count)
+{
+	struct we20cam_dev *sensor = dev_get_drvdata(dev);
+	int ret = 0;
+
+	ret = kstrtouint(buf, 0, &sensor->i_fpga_mirror_vertical);
+	if (ret)
+	{
+		dev_err(dev, "Error %d at %s:%d\n", ret, __FUNCTION__, __LINE__);
+		return -EINVAL;
+	}
+
+	fpga_enable_all(sensor, false);
+
+	if (sensor->i_fpga_mirror_vertical)
+	{
+		sensor->i_fpga_control_register |= FPGA_MIRROR_VERTICAL_ENABLE;
+	}
+	else
+	{
+		sensor->i_fpga_control_register &= ~FPGA_MIRROR_VERTICAL_ENABLE;
+	}
+	fpga_enable_all(sensor, true);
+
+	return count;
+}
+
+static DEVICE_ATTR(width, S_IRUGO | S_IWUSR, exor_camera_width_show, exor_camera_width_store);
+static DEVICE_ATTR(height, S_IRUGO | S_IWUSR, exor_camera_height_show, exor_camera_height_store);
+static DEVICE_ATTR(rotation, S_IRUGO | S_IWUSR, exor_camera_rotation_show, exor_camera_rotation_store);
+static DEVICE_ATTR(mirror_horizontal, S_IRUGO | S_IWUSR, exor_camera_mirror_horizontal_show, exor_camera_mirror_horizontal_store);
+static DEVICE_ATTR(mirror_vertical, S_IRUGO | S_IWUSR, exor_camera_mirror_vertical_show, exor_camera_mirror_vertical_store);
 
 static struct attribute *we20cam_attrs[] =
 {
-	&dev_attr_gpio_in.attr,
-	&dev_attr_gpio_out.attr,
-	&dev_attr_reg.attr,
-	&dev_attr_val.attr,
+	& dev_attr_gpio_in.attr,
+	& dev_attr_gpio_out.attr,
+	& dev_attr_reg.attr,
+	& dev_attr_val.attr,
+	& dev_attr_width.attr,
+	& dev_attr_height.attr,
+	& dev_attr_rotation.attr,
+	& dev_attr_mirror_horizontal.attr,
+	& dev_attr_mirror_vertical.attr,
 	NULL
 };
 
@@ -1041,7 +1384,7 @@ static int we20cam_probe(struct i2c_client *client,
 	if (ret)
 		goto free_ctrls;
 
-	sensor->dev_folder = root_device_register("we20cam");
+	sensor->dev_folder = root_device_register("exor_camera");
 	if (IS_ERR(sensor->dev_folder)) {
 		dev_err(dev, "sysfs folder creation failed\n");
 		goto free_ctrls;
