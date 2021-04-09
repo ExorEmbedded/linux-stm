@@ -39,6 +39,7 @@ static DEFINE_MUTEX(spi_lock);
 struct tja1145_data {
 	struct tja1145_functions_accessor func_acc;
 	struct spi_device	*spi;
+	int put_to_sleep;
 };
 
 static const struct spi_device_id tja1145_id[] = {
@@ -90,6 +91,7 @@ static u8 regs_list[] = {
 	REG_IDENTIFICATION
 };
 
+static void tja1145_set_working_normal_mode( struct spi_device *spi );
 /*
  * tja1145_driver_version --> guard function
  */
@@ -352,6 +354,8 @@ static void tja1145_configure_wake_can( struct spi_device *spi, struct can_filte
 			 (wu_settings->can_id & CAN_EFF_FLAG) ? "Extended" : "Standard", \
 			 (wu_settings->can_id & CAN_EFF_MASK), wu_settings->can_mask );
 
+	tja1145_set_working_normal_mode(spi);
+
 	if(wu_settings->can_id &  CAN_EFF_FLAG)
 		tja1145_configure_wake_can_extendedId(spi, wu_settings);
 	else
@@ -393,20 +397,24 @@ static void tja1145_ioctl( struct tja1145_functions_accessor *facc, struct ifreq
 	struct can_filter __user *cf = ifr->ifr_data;
 	struct can_filter wu_settings;
 
-	dev_dbg(&spi->dev, "%s cmd: 0X%04X\n", __func__, cmd );
 	switch (cmd) {
 		case SIOCTJA1145SETWAKEUP:
 			dev_dbg(&spi->dev, "%s SIOCTJA1145SETWAKEUP\n", __func__ );
 			if( !copy_from_user(&wu_settings, cf, sizeof(wu_settings)) )
+			{
 				tja1145_configure_wake_can(spi, &wu_settings);
+				data->put_to_sleep = 1;
+			}
 			break;
 		case SIOCTJA1145DISWAKEUP:
 			dev_dbg(&spi->dev, "%s SIOCTJA1145DISWAKEUP\n", __func__ );
 			tja1145_configure_wake_can_disable(spi);
+			data->put_to_sleep = 1;
 			break;
 		case SIOCTJA1145NORMALMODE:
 			dev_dbg(&spi->dev, "%s SIOCTJA1145NORMALMODE\n", __func__ );
 			tja1145_set_working_normal_mode(spi);
+			data->put_to_sleep = 0;
 			break;
 		case SIOCTJA1145DUMPREGS:
 			dev_dbg(&spi->dev, "%s SIOCTJA1145DUMPREGS\n", __func__ );
@@ -427,6 +435,12 @@ static void tja1145_change_bitrate( struct tja1145_functions_accessor *facc, __u
 	struct tja1145_data* data = container_of(facc, struct tja1145_data, func_acc);
 	struct spi_device*   spi  = data->spi;
 	dev_dbg(&spi->dev, "%s %d \n", __func__, bitrate );
+
+	if (data->put_to_sleep)
+	{
+		dev_err(&spi->dev, "Refusing to change bitrate: the transceiver was put to sleep.");
+		return;
+	}
 
 	switch (bitrate) {
 	case 50000:
@@ -481,7 +495,14 @@ static void tja1145_start_working( struct tja1145_functions_accessor *facc )
 	struct tja1145_data* data = container_of(facc, struct tja1145_data, func_acc);
 	struct spi_device*   spi  = data->spi;
 	dev_dbg(&spi->dev, "%s \n", __func__ );
-	tja1145_set_working_normal_mode(spi);
+	if (!data->put_to_sleep)
+	{
+		tja1145_set_working_normal_mode(spi);
+	}
+	else
+	{
+		dev_err(&spi->dev, "Refusing to start transceiver, because it was put to sleep.");
+	}
 }
 
 /*
@@ -590,3 +611,4 @@ module_spi_driver(tja1145_spi_driver);
 MODULE_AUTHOR("Luigi Scagnet <luigi.scagnet@exorint.it>, ");
 MODULE_DESCRIPTION("NXP TJA1145 CAN transceiver driver");
 MODULE_LICENSE("GPL");
+/* vim: set noexpandtab tabstop=4 shiftwidth=4: */

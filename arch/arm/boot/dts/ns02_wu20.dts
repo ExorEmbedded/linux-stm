@@ -85,6 +85,7 @@
 		ethernet0 = &ethernet0;
 		spi0 = &spi3;
 		spi1 = &spi5;
+		spi2 = &spi2;
 		mmc0 = &sdmmc1;
 		mmc1 = &sdmmc2;
 		can0 = &m_can1;
@@ -237,16 +238,27 @@
 	};
 
 	working_hours {
-	  compatible = "working_hours";
-	  nvmem-names = "eeprom", "rtcnvram";
-	  nvmem = <&seeprom0>, <&m41t83>;
-	  backlight = <&backlight>;
-	  status = "okay";
+		compatible = "working_hours";
+		nvmem-names = "eeprom", "rtcnvram";
+		nvmem = <&seeprom0>, <&m41t83>;
+		backlight = <&backlight>;
+		status = "okay";
 	};
 
 	beeper {
-	  compatible = "pwm-beeper";
-	  pwms = <&pwm5 0 50000 0>;
+		compatible = "pwm-beeper";
+		pwms = <&pwm5 0 50000 0>;
+	};
+
+	dig_io:dig_io {
+		compatible = "exor,gpio_initializer";
+		pinctrl-names = "default";
+
+		gpios = <&gpioe 5  0x21>, <&gpioe 12 0x21>, <&gpioe 4 0x21>, <&gpiog 12 0x21>, <&gpioa 3 0x21>,  <&gpiob 1 0x21>,
+				<&gpiod 12 0x20>, <&gpiod 14 0x20>, <&gpioe 6 0x20>, <&gpioh 8 0x20>,  <&gpiod 15 0x20>, <&gpioh 2 0x20>;
+
+		gpio-names = "flt12", "flt34", "in1", "in2", "in3", "in4",
+					 "en12", "en34", "out1", "out2", "out3", "out4";
 	};
 	
 	/* USER CODE END root */
@@ -686,6 +698,21 @@
 			};
 	};
 
+
+	spi2_pins_ns02: spi2-0 {
+		pins1 {
+			pinmux = <STM32_PINMUX('B',10, AF5)>, /* SPI2_SCK */
+					 <STM32_PINMUX('I', 3, AF5)>; /* SPI2_MOSI */
+                     bias-disable;
+                     drive-push-pull;
+                     slew-rate = <1>;
+		};
+		pins2 {
+				 pinmux = <STM32_PINMUX('I', 2, AF5)>; /* SPI2_MISO */
+				 bias-pull-up;
+		};
+	};	
+	
 	dcmi_pins_ns02: dcmi_ns02-0 {
 		pins {
 			pinmux = <STM32_PINMUX('D', 9,  AF13)>,/* DCMI_HSYNC */
@@ -1034,9 +1061,12 @@
 
 	/* USER CODE BEGIN sdmmc2 */
 	non-removable;
+	no-sd;
+	no-sdio;
 	st,neg-edge;
 	bus-width = <8>;
 	vmmc-supply = <&v3v3>;
+	mmc-ddr-3_3v;
 	keep-power-in-suspend;
 	/* USER CODE END sdmmc2 */
 };
@@ -1268,6 +1298,25 @@ memory-region = <&retram>, <&mcuram>, <&mcuram2>, <&vdev0vring0>,
 		cdns,tchsh-ns = <4>;
 		cdns,tslch-ns = <4>;
 	};
+};
+
+&spi2 {
+	status = "okay";
+
+	pinctrl-0 = <&spi2_pins_ns02>;
+	pinctrl-names = "default";
+	cs-gpios = <&gpioe 8 GPIO_ACTIVE_LOW>;
+	/delete-property/dmas;
+	/delete-property/dma-names;
+
+    fram: at25@3 {
+        compatible = "atmel,at25", "st,m95256";
+        reg = <0>;
+        spi-max-frequency = <20000000>;
+        pagesize = <64>;
+        size = <65536>;
+        address-width = <16>;
+    };	
 };
 
 &dcmi {

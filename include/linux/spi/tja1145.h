@@ -28,7 +28,7 @@
 #include	<linux/can.h>
 
 #define		MAJOR_DRIVER_VERS			1
-#define		MINOR_DRIVER_VERS			5
+#define		MINOR_DRIVER_VERS			6
 /***********************************/
 /****** TJA1145 SPI Registers ******/
 /***********************************/
