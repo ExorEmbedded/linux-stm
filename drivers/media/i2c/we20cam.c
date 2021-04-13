@@ -30,6 +30,7 @@
 #include <media/i2c/we20cam.h>
 
 enum we20cam_mode_id {
+	WE20CAM_MODE_800_480,
 	WE20CAM_MODE_640_480,
 	WE20CAM_MODE_480_480,
 	WE20CAM_MODE_320_480,
@@ -114,13 +115,13 @@ struct we20cam_dev {
 #define FPGA_SCALER_WIDTH_REG	0x20C
 #define FPGA_SCALER_HEIGHT_REG	0x210
 #define FPGA_CLOCKED_VIDEO_OUTPUT_CONTROL_REG	0x400
-#define FPGA_CLIPPER_CONTROL_REG	0x4000
-#define FPGA_CLIPPER_WIDTH_REG	0x4004
-#define FPGA_CLIPPER_HEIGHT_REG	0x4008
-#define FPGA_CLIPPER_BLANKING_WIDTH_REG	0x400C
-#define FPGA_CLIPPER_BLANKING_HEIGHT_REG	0x4010
+#define FPGA_CLIPPER_CONTROL_REG	0x8000
+#define FPGA_CLIPPER_WIDTH_REG	0x8004
+#define FPGA_CLIPPER_HEIGHT_REG	0x8008
+#define FPGA_CLIPPER_BLANKING_WIDTH_REG	0x800C
+#define FPGA_CLIPPER_BLANKING_HEIGHT_REG	0x8010
 
-#define DEFAULT_WIDTH	640
+#define DEFAULT_WIDTH	800
 #define DEFAULT_HEIGHT	480
 
 #define FPGA_ROTATION_ENABLE	0x1
@@ -146,6 +147,7 @@ static inline struct we20cam_dev *to_we20cam_dev(struct v4l2_subdev *sd)
 
 static const struct we20cam_mode_info
 we20cam_mode_data[WE20CAM_NUM_MODES] = {
+	{WE20CAM_MODE_800_480, 800, 480},
 	{WE20CAM_MODE_640_480, 640, 480},
 	{WE20CAM_MODE_640_480, 480, 480},
 	{WE20CAM_MODE_320_480, 320, 480}
@@ -991,17 +993,6 @@ static void fpga_enable_all(struct we20cam_dev *sensor, const bool b_enable)
 {
 	int ret = 0;
 
-	ret = we20cam_write_reg32_device(
-		sensor,
-		sensor->i2c_client->addr,
-		FPGA_SCALER_CONTROL_REG,
-		b_enable ? FPGA_SCALER_ENABLE : FPGA_SCALER_DISABLE);
-	ret = we20cam_write_reg32_device(
-		sensor,
-		sensor->i2c_client->addr,
-		FPGA_CLIPPER_CONTROL_REG,
-		b_enable ? FPGA_SCALER_ENABLE : FPGA_SCALER_DISABLE);
-
 	if (b_enable)
 		sensor->i_fpga_control_register |= FPGA_ROTATION_ENABLE;
 	else
@@ -1011,6 +1002,18 @@ static void fpga_enable_all(struct we20cam_dev *sensor, const bool b_enable)
 		sensor->i2c_client->addr,
 		FPGA_ROTATION_CONTROL_REG,
 		sensor->i_fpga_control_register);
+
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_SCALER_CONTROL_REG,
+		b_enable ? FPGA_SCALER_ENABLE : FPGA_SCALER_DISABLE);
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_CLIPPER_CONTROL_REG,
+		b_enable ? FPGA_CLIPPER_ENABLE : FPGA_CLIPPER_DISABLE);
+
 	ret = we20cam_write_reg32_device(
 		sensor,
 		sensor->i2c_client->addr,
