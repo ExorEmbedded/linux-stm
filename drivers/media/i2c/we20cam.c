@@ -38,9 +38,15 @@ enum we20cam_mode_id {
 };
 
 enum we20cam_frame_rate {
-	WE20CAM_15_FPS = 0,
+	WE20CAM_FIRST_FPS = 0,
+	WE20CAM_5_FPS = 0,
+	WE20CAM_10_FPS,
+	WE20CAM_15_FPS,
+	WE20CAM_20_FPS,
+	WE20CAM_25_FPS,
 	WE20CAM_30_FPS,
 	WE20CAM_NUM_FRAMERATES,
+	WE20CAM_LAST_FPS = WE20CAM_NUM_FRAMERATES-1,
 };
 
 struct we20cam_pixfmt {
@@ -55,7 +61,11 @@ static const struct we20cam_pixfmt we20cam_formats[] = {
 };
 
 static const int we20cam_framerates[] = {
+	[WE20CAM_5_FPS] = 5,
+	[WE20CAM_10_FPS] = 10,
 	[WE20CAM_15_FPS] = 15,
+	[WE20CAM_20_FPS] = 20,
+	[WE20CAM_25_FPS] = 25,
 	[WE20CAM_30_FPS] = 30,
 };
 
@@ -108,6 +118,7 @@ struct we20cam_dev {
 	u32 i_fpga_mirror_vertical;
 };
 
+#define WE20CAM_VIDEO_SELECT_REG	0x00
 #define WE20CAM_GPIO_IN_REG	0x00
 #define WE20CAM_GPIO_OUT_REG	0x01
 #define FPGA_ROTATION_CONTROL_REG	0x80
@@ -342,28 +353,44 @@ static int we20cam_try_frame_interval(struct we20cam_dev *sensor,
 	u32 minfps, maxfps, fps;
 	int ret;
 
-	minfps = we20cam_framerates[WE20CAM_15_FPS];
-	maxfps = we20cam_framerates[WE20CAM_30_FPS];
+	minfps = we20cam_framerates[WE20CAM_FIRST_FPS];
+	maxfps = we20cam_framerates[WE20CAM_LAST_FPS];
 
 	if (fi->numerator == 0) {
 		fi->denominator = maxfps;
 		fi->numerator = 1;
-		return WE20CAM_30_FPS;
+		return WE20CAM_LAST_FPS;
 	}
 
 	fps = DIV_ROUND_CLOSEST(fi->denominator, fi->numerator);
 
 	fi->numerator = 1;
 	if (fps > maxfps)
+	{
 		fi->denominator = maxfps;
+		ret = WE20CAM_LAST_FPS;
+	}
 	else if (fps < minfps)
+	{
 		fi->denominator = minfps;
-	else if (2 * fps >= 2 * minfps + (maxfps - minfps))
-		fi->denominator = maxfps;
+		ret = WE20CAM_FIRST_FPS;
+	}
 	else
-		fi->denominator = minfps;
+	{
+		for (ret = 0; ret < WE20CAM_NUM_FRAMERATES; ++ret)
+		{
+			if (we20cam_framerates[ret] == fps)
+			{
+				break;
+			}
+		}
+	}
 
-	ret = (fi->denominator == minfps) ? WE20CAM_15_FPS : WE20CAM_30_FPS;
+	// not found?
+	if (ret >= WE20CAM_NUM_FRAMERATES)
+	{	// assume max is reasonable default
+		ret = WE20CAM_LAST_FPS;
+	}
 
 	mode = we20cam_find_mode(sensor, ret, width, height, false);
 	return mode ? ret : -EINVAL;
@@ -994,6 +1021,22 @@ static void fpga_enable_all(struct we20cam_dev *sensor, const bool b_enable)
 	int ret = 0;
 
 	if (b_enable)
+	{	// deassert reset
+		u32 i_value = 0;
+		ret = we20cam_read_reg32_device(
+			sensor,
+			sensor->i2c_client->addr,
+			WE20CAM_VIDEO_SELECT_REG,
+			&i_value);
+		i_value &= ~(1 << 6);
+		ret = we20cam_write_reg32_device(
+			sensor,
+			sensor->i2c_client->addr,
+			WE20CAM_VIDEO_SELECT_REG,
+			i_value);
+	}
+
+	if (b_enable)
 		sensor->i_fpga_control_register |= FPGA_ROTATION_ENABLE;
 	else
 		sensor->i_fpga_control_register &= ~FPGA_ROTATION_ENABLE;
@@ -1020,6 +1063,21 @@ static void fpga_enable_all(struct we20cam_dev *sensor, const bool b_enable)
 		FPGA_CLOCKED_VIDEO_OUTPUT_CONTROL_REG,
 		b_enable ? FPGA_CVO_ENABLE : FPGA_CVO_DISABLE);
 
+	if (!b_enable)
+	{	// assert reset
+		u32 i_value = 0;
+		ret = we20cam_read_reg32_device(
+			sensor,
+			sensor->i2c_client->addr,
+			WE20CAM_VIDEO_SELECT_REG,
+			&i_value);
+		i_value |= (1 << 6);
+		ret = we20cam_write_reg32_device(
+			sensor,
+			sensor->i2c_client->addr,
+			WE20CAM_VIDEO_SELECT_REG,
+			i_value);
+	}
 }
 
 static ssize_t exor_camera_width_show(
