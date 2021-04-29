@@ -185,6 +185,7 @@ static int we20cam_write_reg_device(
 		msg.buf = buf;
 		msg.len = sizeof(buf);
 
+//printk("dbgw8 %x=%d\n", reg, val);
 		/* must use i2c_transfer() here,
 		 * i2c_smbus_write_byte_data() doesn't work
 		 * */
@@ -247,6 +248,7 @@ static int we20cam_write_reg32_device(
 		msg.buf = buf;
 		msg.len = sizeof(buf);
 
+//printk("dbgw32 %x=%d\n", reg, val);
 		/* must use i2c_transfer() here,
 		 * i2c_smbus_write_byte_data() doesn't work
 		 * */
@@ -567,7 +569,7 @@ static const struct v4l2_ctrl_config we20cam_ctrl_set_pattern = {
 	.min = 0,
 	.max = 15,
 	.step = 1,
-	.def = 0,
+	.def = 0,	// default solid blue
 	.flags = V4L2_CTRL_FLAG_VOLATILE | V4L2_CTRL_FLAG_EXECUTE_ON_WRITE,
 };
 
@@ -1020,6 +1022,7 @@ static void fpga_enable_all(struct we20cam_dev *sensor, const bool b_enable)
 {
 	int ret = 0;
 
+#if 0
 	if (b_enable)
 	{	// deassert reset
 		u32 i_value = 0;
@@ -1034,7 +1037,10 @@ static void fpga_enable_all(struct we20cam_dev *sensor, const bool b_enable)
 			sensor->i2c_client->addr,
 			WE20CAM_VIDEO_SELECT_REG,
 			i_value);
+			
+		usleep_range(100*1000, 200*1000);
 	}
+#endif
 
 	if (b_enable)
 		sensor->i_fpga_control_register |= FPGA_ROTATION_ENABLE;
@@ -1063,6 +1069,7 @@ static void fpga_enable_all(struct we20cam_dev *sensor, const bool b_enable)
 		FPGA_CLOCKED_VIDEO_OUTPUT_CONTROL_REG,
 		b_enable ? FPGA_CVO_ENABLE : FPGA_CVO_DISABLE);
 
+#if 1
 	if (!b_enable)
 	{	// assert reset
 		u32 i_value = 0;
@@ -1071,13 +1078,24 @@ static void fpga_enable_all(struct we20cam_dev *sensor, const bool b_enable)
 			sensor->i2c_client->addr,
 			WE20CAM_VIDEO_SELECT_REG,
 			&i_value);
-		i_value |= (1 << 6);
+		i_value |= (1 << 6);	// reset on
+		i_value &= ~(1 << 7);	// nsom hardware
+		ret = we20cam_write_reg32_device(
+			sensor,
+			sensor->i2c_client->addr,
+			WE20CAM_VIDEO_SELECT_REG,
+			i_value);
+
+		usleep_range(100 * 1000, 200 * 1000);
+
+		i_value &= ~(1 << 6);	// reset off
 		ret = we20cam_write_reg32_device(
 			sensor,
 			sensor->i2c_client->addr,
 			WE20CAM_VIDEO_SELECT_REG,
 			i_value);
 	}
+#endif
 }
 
 static ssize_t exor_camera_width_show(
@@ -1234,7 +1252,7 @@ static ssize_t exor_camera_rotation_store(
 		return -EINVAL;
 	}
 
-	fpga_enable_all(sensor, false);
+//	fpga_enable_all(sensor, false);
 
 	sensor->i_fpga_control_register &= ~FPGA_ROTATION_ANGLE_MASK;
 	switch (sensor->i_fpga_rotation)
@@ -1246,7 +1264,12 @@ static ssize_t exor_camera_rotation_store(
 	default: sensor->i_fpga_control_register |= (0x0 << 1); break;
 	}
 	
-	fpga_enable_all(sensor, true);
+//	fpga_enable_all(sensor, true);
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_ROTATION_CONTROL_REG,
+		sensor->i_fpga_control_register);
 
 	return count;
 }
@@ -1285,7 +1308,7 @@ static ssize_t exor_camera_mirror_horizontal_store(
 		return -EINVAL;
 	}
 
-	fpga_enable_all(sensor, false);
+//	fpga_enable_all(sensor, false);
 
 	if (sensor->i_fpga_mirror_horizontal)
 	{
@@ -1295,7 +1318,12 @@ static ssize_t exor_camera_mirror_horizontal_store(
 	{
 		sensor->i_fpga_control_register &= ~FPGA_MIRROR_HORIZONTAL_ENABLE;
 	}
-	fpga_enable_all(sensor, true);
+//	fpga_enable_all(sensor, true);
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_ROTATION_CONTROL_REG,
+		sensor->i_fpga_control_register);
 
 	return count;
 }
@@ -1334,7 +1362,7 @@ static ssize_t exor_camera_mirror_vertical_store(
 		return -EINVAL;
 	}
 
-	fpga_enable_all(sensor, false);
+//	fpga_enable_all(sensor, false);
 
 	if (sensor->i_fpga_mirror_vertical)
 	{
@@ -1344,7 +1372,12 @@ static ssize_t exor_camera_mirror_vertical_store(
 	{
 		sensor->i_fpga_control_register &= ~FPGA_MIRROR_VERTICAL_ENABLE;
 	}
-	fpga_enable_all(sensor, true);
+//	fpga_enable_all(sensor, true);
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_ROTATION_CONTROL_REG,
+		sensor->i_fpga_control_register);
 
 	return count;
 }
