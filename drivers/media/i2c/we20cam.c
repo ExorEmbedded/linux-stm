@@ -132,8 +132,12 @@ struct we20cam_dev {
 #define FPGA_CLIPPER_BLANKING_WIDTH_REG	0x800C
 #define FPGA_CLIPPER_BLANKING_HEIGHT_REG	0x8010
 
-#define DEFAULT_WIDTH	800
-#define DEFAULT_HEIGHT	480
+#define WIDTH_DEFAULT	800
+#define WIDTH_MAX	800
+#define WIDTH_MIN	150
+#define HEIGHT_DEFAULT	480
+#define HEIGHT_MAX	480
+#define HEIGHT_MIN	150
 
 #define FPGA_ROTATION_ENABLE	0x1
 #define FPGA_ROTATION_ANGLE_MASK	( (1<<2) | (1<<1) )
@@ -1018,6 +1022,67 @@ static ssize_t exor_camera_val_store(
  * */
 static DEVICE_ATTR(val, S_IRUGO | S_IWUSR, exor_camera_val_show, exor_camera_val_store);
 
+static void fpga_set_width(struct we20cam_dev *sensor)
+{
+	int ret;
+
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_SCALER_WIDTH_REG,
+		sensor->i_fpga_width);
+
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_CLIPPER_WIDTH_REG,
+		sensor->i_fpga_width);
+//	usleep_range(10 * 1000, 20 * 1000);
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_CLIPPER_BLANKING_WIDTH_REG,
+		WIDTH_DEFAULT - sensor->i_fpga_width);
+//	usleep_range(10 * 1000, 20 * 1000);
+}
+
+static void fpga_set_height(struct we20cam_dev *sensor)
+{
+	int ret;
+
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_SCALER_HEIGHT_REG,
+		sensor->i_fpga_height + 0);
+	// fix for last couples lines sometimes being incomplete and slowly flashing: we clip them out
+
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_CLIPPER_HEIGHT_REG,
+		sensor->i_fpga_height);
+//	usleep_range(10 * 1000, 20 * 1000);
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_CLIPPER_BLANKING_HEIGHT_REG,
+		HEIGHT_DEFAULT - sensor->i_fpga_height);
+//	usleep_range(10 * 1000, 20 * 1000);
+}
+
+static void fpga_set_rotation(struct we20cam_dev *sensor)
+{
+	int ret;
+
+	ret = we20cam_write_reg32_device(
+		sensor,
+		sensor->i2c_client->addr,
+		FPGA_ROTATION_CONTROL_REG,
+		sensor->i_fpga_control_register);
+}
+
+
 static void fpga_enable_all(struct we20cam_dev *sensor, const bool b_enable)
 {
 	int ret = 0;
@@ -1086,7 +1151,7 @@ static void fpga_enable_all(struct we20cam_dev *sensor, const bool b_enable)
 			WE20CAM_VIDEO_SELECT_REG,
 			i_value);
 
-		usleep_range(100 * 1000, 200 * 1000);
+		usleep_range(10 * 1000, 20 * 1000);
 
 		i_value &= ~(1 << 6);	// reset off
 		ret = we20cam_write_reg32_device(
@@ -1132,26 +1197,17 @@ static ssize_t exor_camera_width_store(
 		return -EINVAL;
 	}
 
+	if (sensor->i_fpga_width < WIDTH_MIN)
+	{
+		sensor->i_fpga_width = WIDTH_MIN;
+	}
+	else if (sensor->i_fpga_width > WIDTH_MAX)
+	{
+		sensor->i_fpga_width = WIDTH_MAX;
+	}
+
 	fpga_enable_all(sensor, false);
-
-	ret = we20cam_write_reg32_device(
-		sensor,
-		sensor->i2c_client->addr,
-		FPGA_SCALER_WIDTH_REG,
-		sensor->i_fpga_width);
-
-	ret = we20cam_write_reg32_device(
-		sensor,
-		sensor->i2c_client->addr,
-		FPGA_CLIPPER_WIDTH_REG,
-		sensor->i_fpga_width);
-	usleep_range(10 * 1000, 20 * 1000);
-	ret = we20cam_write_reg32_device(
-		sensor,
-		sensor->i2c_client->addr,
-		FPGA_CLIPPER_BLANKING_WIDTH_REG,
-		DEFAULT_WIDTH - sensor->i_fpga_width);
-	usleep_range(10 * 1000, 20 * 1000);
+	fpga_set_width(sensor);
 
 //	fpga_enable_all(state, true);
 
@@ -1192,26 +1248,19 @@ static ssize_t exor_camera_height_store(
 		return -EINVAL;
 	}
 
+	if (sensor->i_fpga_height < HEIGHT_MIN)
+	{
+		sensor->i_fpga_height = HEIGHT_MIN;
+	}
+	else if (sensor->i_fpga_height > HEIGHT_MAX)
+	{
+		sensor->i_fpga_height = HEIGHT_MAX;
+	}
+
 //	fpga_enable_all(state, false);
 
-	ret = we20cam_write_reg32_device(
-		sensor,
-		sensor->i2c_client->addr,
-		FPGA_SCALER_HEIGHT_REG,
-		sensor->i_fpga_height);
-
-	ret = we20cam_write_reg32_device(
-		sensor,
-		sensor->i2c_client->addr,
-		FPGA_CLIPPER_HEIGHT_REG,
-		sensor->i_fpga_height);
-	usleep_range(10 * 1000, 20 * 1000);
-	ret = we20cam_write_reg32_device(
-		sensor,
-		sensor->i2c_client->addr,
-		FPGA_CLIPPER_BLANKING_HEIGHT_REG,
-		DEFAULT_HEIGHT - sensor->i_fpga_height);
-	usleep_range(10 * 1000, 20 * 1000);
+	fpga_set_height(sensor);
+//	fpga_set_rotation(sensor);
 
 	fpga_enable_all(sensor, true);
 
@@ -1252,7 +1301,7 @@ static ssize_t exor_camera_rotation_store(
 		return -EINVAL;
 	}
 
-//	fpga_enable_all(sensor, false);
+	fpga_enable_all(sensor, false);
 
 	sensor->i_fpga_control_register &= ~FPGA_ROTATION_ANGLE_MASK;
 	switch (sensor->i_fpga_rotation)
@@ -1264,12 +1313,10 @@ static ssize_t exor_camera_rotation_store(
 	default: sensor->i_fpga_control_register |= (0x0 << 1); break;
 	}
 	
-//	fpga_enable_all(sensor, true);
-	ret = we20cam_write_reg32_device(
-		sensor,
-		sensor->i2c_client->addr,
-		FPGA_ROTATION_CONTROL_REG,
-		sensor->i_fpga_control_register);
+	fpga_enable_all(sensor, true);
+	fpga_set_width(sensor);
+	fpga_set_height(sensor);
+	fpga_set_rotation(sensor);
 
 	return count;
 }
@@ -1308,7 +1355,7 @@ static ssize_t exor_camera_mirror_horizontal_store(
 		return -EINVAL;
 	}
 
-//	fpga_enable_all(sensor, false);
+	fpga_enable_all(sensor, false);
 
 	if (sensor->i_fpga_mirror_horizontal)
 	{
@@ -1318,12 +1365,11 @@ static ssize_t exor_camera_mirror_horizontal_store(
 	{
 		sensor->i_fpga_control_register &= ~FPGA_MIRROR_HORIZONTAL_ENABLE;
 	}
-//	fpga_enable_all(sensor, true);
-	ret = we20cam_write_reg32_device(
-		sensor,
-		sensor->i2c_client->addr,
-		FPGA_ROTATION_CONTROL_REG,
-		sensor->i_fpga_control_register);
+
+	fpga_enable_all(sensor, true);
+	fpga_set_width(sensor);
+	fpga_set_height(sensor);
+	fpga_set_rotation(sensor);
 
 	return count;
 }
@@ -1362,7 +1408,7 @@ static ssize_t exor_camera_mirror_vertical_store(
 		return -EINVAL;
 	}
 
-//	fpga_enable_all(sensor, false);
+	fpga_enable_all(sensor, false);
 
 	if (sensor->i_fpga_mirror_vertical)
 	{
@@ -1372,12 +1418,11 @@ static ssize_t exor_camera_mirror_vertical_store(
 	{
 		sensor->i_fpga_control_register &= ~FPGA_MIRROR_VERTICAL_ENABLE;
 	}
-//	fpga_enable_all(sensor, true);
-	ret = we20cam_write_reg32_device(
-		sensor,
-		sensor->i2c_client->addr,
-		FPGA_ROTATION_CONTROL_REG,
-		sensor->i_fpga_control_register);
+
+	fpga_enable_all(sensor, true);
+	fpga_set_width(sensor);
+	fpga_set_height(sensor);
+	fpga_set_rotation(sensor);
 
 	return count;
 }

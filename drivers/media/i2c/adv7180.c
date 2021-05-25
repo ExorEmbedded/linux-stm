@@ -1475,11 +1475,15 @@ static int adv7180_probe(struct i2c_client *client,
 //	adv7180_write(state, 0x0037, 0x21); // rev vs polarity
 	adv7180_write(state, 0x0037, 0x01); // normal vs polarity
 	
-#if 0	// deinterlacer
+#if 1	// deinterlacer
 // currently disabled because the one in FPGA is better
 	adv7180_vpp_write(state, 0x00A3, 0x00); // ADI required write
 	adv7180_vpp_write(state, 0x005B, 0x00); // enable advanced timing mode
 	adv7180_vpp_write(state, 0x0055, 0x80); // enable deinterlacer
+
+	printk("adv7280 deinterlacer enabled\n");
+#else
+	printk("adv7280 deinterlacer disabled\n");
 #endif
 
 	state->controls_initialized = true;
