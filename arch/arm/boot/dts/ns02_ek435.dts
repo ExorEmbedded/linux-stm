@@ -81,6 +81,7 @@
 	aliases {
 		serial0 = &uart5;
 		serial1 = &uart7;
+		serial2 = &uart4;
 		ethernet1 = &usbeth;
 		ethernet0 = &ethernet0;
 		spi0 = &spi3;
@@ -403,6 +404,31 @@
 					 <STM32_PINMUX('B', 9, ANALOG)>, /* SDMMC2_D5 */
 					 <STM32_PINMUX('C', 6, ANALOG)>, /* SDMMC2_D6 */
 					 <STM32_PINMUX('C', 7, ANALOG)>; /* SDMMC2_D7 */
+		};
+	};
+
+	uart4_pins_mx: uart4_mx-0 {
+		u-boot,dm-pre-reloc;
+		pins1 {
+			u-boot,dm-pre-reloc;
+			pinmux = <STM32_PINMUX('H', 14, AF8)>; /* UART4_RX */
+			bias-disable;
+		};
+		pins2 {
+			u-boot,dm-pre-reloc;
+			pinmux = <STM32_PINMUX('A', 13, AF8)>; /* UART4_TX */
+			bias-disable;
+			drive-push-pull;
+			slew-rate = <0>;
+		};
+	};
+
+	uart4_sleep_pins_mx: uart4_sleep_mx-0 {
+		u-boot,dm-pre-reloc;
+		pins {
+			u-boot,dm-pre-reloc;
+			pinmux = <STM32_PINMUX('H', 14, ANALOG)>, /* UART4_RX */
+					 <STM32_PINMUX('A', 13, ANALOG)>; /* UART4_TX */
 		};
 	};
 
@@ -979,6 +1005,15 @@
 		status = "okay";
 	};
 	/* USER CODE END timers6 */
+};
+
+&uart4{
+	u-boot,dm-pre-reloc;
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&uart4_pins_mx>;
+	pinctrl-1 = <&uart4_sleep_pins_mx>;
+	
+	status = "okay";
 };
 
 &uart5{
