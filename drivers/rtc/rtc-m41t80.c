@@ -215,11 +215,6 @@ static int m41t80_get_datetime(struct i2c_client *client,
 	if (flags < 0)
 		return flags;
 
-	if (flags & M41T80_FLAGS_OF) {
-		dev_err(&client->dev, "Oscillator failure, data is invalid.\n");
-		return -EINVAL;
-	}
-
 	err = i2c_smbus_read_i2c_block_data(client, M41T80_REG_SSEC,
 					    sizeof(buf), buf);
 	if (err < 0) {
