@@ -1517,6 +1517,14 @@ static int hub_configure(struct usb_hub *hub,
 	 * and battery-powered root hubs (may provide just 8 mA).
 	 */
 	ret = usb_get_std_status(hdev, USB_RECIP_DEVICE, 0, &hubstatus);
+	
+	/* BSP-2862: Force USB_DEVICE_SELF_POWERED mode for USB3803 hubs */
+	if((hdev->descriptor.idVendor==0x424) && (hdev->descriptor.idProduct==0x3803))
+	{
+	  dev_info(&hdev->dev,"Forcing self_powered mode for idVendor=0x%x, idProduct=0x%x\n",hdev->descriptor.idVendor,hdev->descriptor.idProduct);
+	  hubstatus |= (1 << USB_DEVICE_SELF_POWERED);
+	}
+
 	if (ret) {
 		message = "can't get hub status";
 		goto fail;
@@ -5001,6 +5009,13 @@ static void hub_port_connect(struct usb_hub *hub, int port1, u16 portstatus,
 				dev_dbg(&udev->dev, "get status %d ?\n", status);
 				goto loop_disable;
 			}
+			
+			/* BSP-2862: Force USB_DEVICE_SELF_POWERED mode for USB3803 hubs */
+			if((udev->descriptor.idVendor==0x424) && (udev->descriptor.idProduct==0x3803))
+			{
+			  devstat |= (1 << USB_DEVICE_SELF_POWERED);
+			}
+			
 			if ((devstat & (1 << USB_DEVICE_SELF_POWERED)) == 0) {
 				dev_err(&udev->dev,
 					"can't connect bus-powered hub "
