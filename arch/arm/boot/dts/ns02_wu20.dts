@@ -228,10 +228,6 @@
 
 	panel_rgb: panel-rgb {
 		compatible = "exor,hw_dispid";
-		pinctrl-names = "default", "sleep";
-		pinctrl-0 = <&ns02_ltdc_pins>;
-		pinctrl-1 = <&ns02_ltdc_pins_sleep>;
-		enable-gpios = <&gpiof 4 GPIO_ACTIVE_HIGH>;
 		backlight = <&backlight>;
 		status = "okay";
 		port {
@@ -554,6 +550,31 @@
 	};
 
 	ns02_ltdc_pins_sleep: ltdc-ns02-1 {
+		pins {
+			pinmux = <STM32_PINMUX('G',  7, ANALOG)>, /* LCD_CLK */
+					 <STM32_PINMUX('I', 10, ANALOG)>, /* LCD_HSYNC */
+					 <STM32_PINMUX('I',  9, ANALOG)>, /* LCD_VSYNC */
+					 <STM32_PINMUX('F', 10, ANALOG)>, /* LCD_DE */
+					 <STM32_PINMUX('H',  9, ANALOG)>, /* LCD_R3 */
+					 <STM32_PINMUX('A', 11, ANALOG)>, /* LCD_R4 */
+					 <STM32_PINMUX('C',  0, ANALOG)>, /* LCD_R5 */
+					 <STM32_PINMUX('H', 12, ANALOG)>, /* LCD_R6 */
+					 <STM32_PINMUX('E', 15, ANALOG)>, /* LCD_R7 */
+					 <STM32_PINMUX('H', 13, ANALOG)>, /* LCD_G2 */
+					 <STM32_PINMUX('G', 10, ANALOG)>, /* LCD_G3 */
+					 <STM32_PINMUX('H',  4, ANALOG)>, /* LCD_G4 */
+					 <STM32_PINMUX('I',  0, ANALOG)>, /* LCD_G5 */
+					 <STM32_PINMUX('I', 11, ANALOG)>, /* LCD_G6 */
+					 <STM32_PINMUX('G',  8, ANALOG)>, /* LCD_G7 */
+					 <STM32_PINMUX('G', 11, ANALOG)>, /* LCD_B3 */
+					 <STM32_PINMUX('I',  4, ANALOG)>, /* LCD_B4 */
+					 <STM32_PINMUX('I',  5, ANALOG)>, /* LCD_B5 */
+					 <STM32_PINMUX('I',  6, ANALOG)>, /* LCD_B6 */
+					 <STM32_PINMUX('D',  8, ANALOG)>; /* LCD_B7 */
+		};
+	};
+
+	ns02_ltdc_pins_init: ltdc-ns02-2 {
 		pins {
 			pinmux = <STM32_PINMUX('G',  7, ANALOG)>, /* LCD_CLK */
 					 <STM32_PINMUX('I', 10, ANALOG)>, /* LCD_HSYNC */
@@ -1167,6 +1188,12 @@
 
 &ltdc {
 	status = "okay";
+	pinctrl-names = "init", "default", "sleep";
+	pinctrl-0 = <&ns02_ltdc_pins_init>;
+	pinctrl-1 = <&ns02_ltdc_pins>;
+	pinctrl-2 = <&ns02_ltdc_pins_sleep>;
+	enable-gpios = <&gpiof 4 GPIO_ACTIVE_HIGH>;
+	
 	port {
 		#address-cells = <1>;
 		#size-cells = <0>;

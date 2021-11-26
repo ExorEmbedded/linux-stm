@@ -12,7 +12,10 @@
 #include <linux/component.h>
 #include <linux/of_address.h>
 #include <linux/of_graph.h>
+#include <linux/pinctrl/consumer.h>
+#include <linux/pm_runtime.h>
 #include <linux/reset.h>
+#include <linux/gpio/consumer.h>
 
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
@@ -437,13 +440,20 @@ static void ltdc_crtc_atomic_enable(struct drm_crtc *crtc,
 				    struct drm_crtc_state *old_state)
 {
 	struct ltdc_device *ldev = crtc_to_ltdc(crtc);
+	struct drm_device* ddev = crtc->dev;
 	int ret;
-
+	
 	DRM_DEBUG_DRIVER("\n");
-
+	
 	ret = ltdc_power_up(ldev);
 	if (ret)
 		return;
+	
+	/* Before enabling the LCD stream, set the en_vdd pin, wait a bit for vdd to settle...*/
+	gpiod_set_value_cansleep(ldev->enable_gpio, 1);
+	msleep(50);
+	/* ...and set the pinmux default state */
+	pinctrl_pm_select_default_state(ddev->dev);
 
 	/* Sets the background color value */
 	reg_write(ldev->regs, LTDC_BCCR, BCCR_BCBLACK);
@@ -464,6 +474,7 @@ static void ltdc_crtc_atomic_disable(struct drm_crtc *crtc,
 				     struct drm_crtc_state *old_state)
 {
 	struct ltdc_device *ldev = crtc_to_ltdc(crtc);
+	struct drm_device* ddev = crtc->dev;
 
 	DRM_DEBUG_DRIVER("\n");
 
@@ -479,6 +490,11 @@ static void ltdc_crtc_atomic_disable(struct drm_crtc *crtc,
 	reg_set(ldev->regs, LTDC_SRCR, SRCR_IMR);
 
 	ltdc_power_down(ldev);
+	
+	/* put the pinmux to sleep/Hi-z state and disable LCD power when LCD stopped */ 
+	pinctrl_pm_select_sleep_state(ddev->dev);
+	msleep(50);
+	gpiod_set_value_cansleep(ldev->enable_gpio, 0);
 }
 
 #define CLK_TOLERANCE_HZ 50
@@ -1161,6 +1177,14 @@ int ltdc_load(struct drm_device *ddev)
 		return PTR_ERR(ldev->pixel_clk);
 	}
 
+	ldev->enable_gpio = devm_gpiod_get_optional(dev, "enable", GPIOD_OUT_HIGH);
+	if (IS_ERR(ldev->enable_gpio)) {
+		if (PTR_ERR(ldev->enable_gpio) != -EPROBE_DEFER)
+			DRM_ERROR("Failed to request enable GPIO\n");
+		return PTR_ERR(ldev->enable_gpio);
+	}
+	msleep(50);
+	
 	ldev->power_on = false;
 	ret = ltdc_power_up(ldev);
 	if (ret)

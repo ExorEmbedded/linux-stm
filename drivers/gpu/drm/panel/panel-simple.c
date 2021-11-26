@@ -2429,11 +2429,6 @@ static const struct panel_desc exor_hwdispid = {
 		.width = 152,
 		.height = 91,
 	},
-	.delay = {
-		.prepare = 110,
-		.enable = 50,
-		.unprepare = 550,
-	},
 };
 
 static const struct of_device_id platform_of_match[] = {

@@ -38,6 +38,7 @@ struct ltdc_device {
 	struct fps_info plane_fpsi[LTDC_MAX_LAYER];
 	struct drm_atomic_state *suspend_state;
 	bool power_on;
+	struct gpio_desc *enable_gpio;
 };
 
 bool ltdc_crtc_scanoutpos(struct drm_device *dev, unsigned int pipe,
