@@ -1223,14 +1223,14 @@ static struct t_DisplayParams displayconfig[] = {
       .pclk_freq = 27000, 
       .pclk_inv  = 0,
       
-      .hs_fp     = 48, 
-      .hs_bp     = 48, 
-      .hs_w      = 8, 
+      .hs_fp     = 8, 
+      .hs_bp     = 5, 
+      .hs_w      = 3, 
       .hs_inv    = 1,
       
-      .vs_fp     = 12, 
-      .vs_bp     = 12, 
-      .vs_w      = 8, 
+      .vs_fp     = 9, 
+      .vs_bp     = 4, 
+      .vs_w      = 3, 
       .vs_inv    = 1,
       
       .blank_inv      = 0,
