@@ -524,17 +524,83 @@ out:
  */
 
 extern int adv7180_we20_command(int command, int param1, int param2);
+static void fpga_enable_all(struct we20cam_dev *sensor, const bool b_enable);
+static void fpga_set_width(struct we20cam_dev *sensor);
+static void fpga_set_height(struct we20cam_dev *sensor);
+static void fpga_set_rotation(struct we20cam_dev *sensor);
+
+void fpga_apply_rotation(struct we20cam_dev *sensor)
+{
+	fpga_enable_all(sensor, false);
+
+	sensor->i_fpga_control_register &= ~FPGA_ROTATION_ANGLE_MASK;
+	switch (sensor->i_fpga_rotation)
+	{
+	case 0: sensor->i_fpga_control_register |= (0x0 << 1); break;
+	case 90: sensor->i_fpga_control_register |= (0x1 << 1); break;
+	case 180: sensor->i_fpga_control_register |= (0x2 << 1); break;
+	case 270: sensor->i_fpga_control_register |= (0x3 << 1); break;
+	default: sensor->i_fpga_control_register |= (0x0 << 1); break;
+	}
+	fpga_enable_all(sensor, true);
+	fpga_set_width(sensor);
+	fpga_set_height(sensor);
+	fpga_set_rotation(sensor);
+}
 
 static int we20cam_s_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct v4l2_subdev *sd = to_we20cam_sd(ctrl);
 	struct we20cam_dev *sensor = to_we20cam_dev(sd);
+	int ret = 0;
+
 	if (sensor->controls_initialized)
 	{
-		return adv7180_we20_command(WE20_CMD_SET_CONTROL, ctrl->id, ctrl->val);
+		/* Changing video input causes FPGA rotation core to freeze,
+		 * sometimes, for some cameras.
+		 * It's not our core so we can't fix it.
+		 * 
+		 * Here is the workaround:
+		 * 1) before changing the input, we rotate
+		 * the video to some other arbitrary setting, just to force
+		 * rotation core to really reinitialize itself later.
+		 * 2) change video input
+		 * 3) wait for at least one new video frame to arrive
+		 * (the workaround doesn't work without this, tested)
+		 * 4) change rotation back to original value
+		 * 
+		 * This all happens reasonably fast and end-user shouldn't
+		 * notice anything at all.
+		 * */
+		 
+		// save original rotation
+		int i_old_rotation = sensor->i_fpga_rotation;
+		// calc temporary new rotation
+		sensor->i_fpga_rotation += 90;
+		if (sensor->i_fpga_rotation == 360)
+			sensor->i_fpga_rotation = 0;
+			
+		// we need the workaround only on changing input
+		if (ctrl->id == V4L2_CID_ADV_SET_INPUT)
+		{
+			// set new rotation
+			fpga_apply_rotation(sensor);
+		}
+
+		ret = adv7180_we20_command(WE20_CMD_SET_CONTROL, ctrl->id, ctrl->val);
+		if (ctrl->id == V4L2_CID_ADV_SET_INPUT)
+		{
+			// wait 50..100 ms for some video frames
+			// (approximate worst case: 40 ms for 25 Hz video)
+			usleep_range(50*1000, 100*1000);
+			
+			// set original rotation
+			sensor->i_fpga_rotation = i_old_rotation;
+			fpga_apply_rotation(sensor);
+		}
 	}
 
-	return 0;
+	return ret;
 }
 
 static const struct v4l2_ctrl_ops we20cam_ctrl_ops = {
@@ -1301,22 +1367,7 @@ static ssize_t exor_camera_rotation_store(
 		return -EINVAL;
 	}
 
-	fpga_enable_all(sensor, false);
-
-	sensor->i_fpga_control_register &= ~FPGA_ROTATION_ANGLE_MASK;
-	switch (sensor->i_fpga_rotation)
-	{
-	case 0: sensor->i_fpga_control_register |= (0x0 << 1); break;
-	case 90: sensor->i_fpga_control_register |= (0x1 << 1); break;
-	case 180: sensor->i_fpga_control_register |= (0x2 << 1); break;
-	case 270: sensor->i_fpga_control_register |= (0x3 << 1); break;
-	default: sensor->i_fpga_control_register |= (0x0 << 1); break;
-	}
-	
-	fpga_enable_all(sensor, true);
-	fpga_set_width(sensor);
-	fpga_set_height(sensor);
-	fpga_set_rotation(sensor);
+	fpga_apply_rotation(sensor);
 
 	return count;
 }
