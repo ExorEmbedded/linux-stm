@@ -150,8 +150,10 @@ static int can_calc_bittiming(struct net_device *dev, struct can_bittiming *bt,
 	}
 
 	/* tseg even = round down, odd = round up */
-	for (tseg = (btc->tseg1_max + btc->tseg2_max) * 2 + 1;
-	     tseg >= (btc->tseg1_min + btc->tseg2_min) * 2; tseg--) {
+//	for (tseg = (btc->tseg1_max + btc->tseg2_max) * 2 + 1;
+//	     tseg >= (btc->tseg1_min + btc->tseg2_min) * 2; tseg--) {
+	for (tseg = (btc->tseg1_min + btc->tseg2_min) * 2;
+	     tseg <= (btc->tseg1_max + btc->tseg2_max) * 2 + 1; tseg++) {
 		tsegall = CAN_CALC_SYNC_SEG + tseg / 2;
 
 		/* Compute all possible tseg choices (tseg=tseg1+tseg2) */
