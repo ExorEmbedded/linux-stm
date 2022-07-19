@@ -1546,6 +1546,18 @@ int adv7180_we20_command(int command, int param1, int param2)
 					return adv7180_s_ctrl(&ctrl);
 				}
 				break;
+
+			case WE20_CMD_QUERY_VIDEO_LOCK:
+			{
+				u32 status = 0;
+				int err = mutex_lock_interruptible(&gp_state->mutex);
+				if (err)
+					return 0;
+				__adv7180_status(gp_state, &status, NULL);
+				mutex_unlock(&gp_state->mutex);
+				return (int)status;
+			}
+				break;
 				
 			default:
 				return -ENXIO;

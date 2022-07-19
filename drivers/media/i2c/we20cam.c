@@ -109,6 +109,7 @@ struct we20cam_dev {
 	bool streaming;
 	bool controls_initialized;
 	struct device* dev_folder;
+	struct timer_list poll_timer;
 
 	u32 i_fpga_control_register;
 	u32 i_fpga_width;
@@ -546,6 +547,35 @@ void fpga_apply_rotation(struct we20cam_dev *sensor)
 	fpga_set_width(sensor);
 	fpga_set_height(sensor);
 	fpga_set_rotation(sensor);
+}
+
+static int fpga_smart_reset(struct we20cam_dev *sensor, bool b_long_delay)
+{
+	// save original rotation
+	int i_old_rotation = sensor->i_fpga_rotation;
+	// calc temporary new rotation
+	sensor->i_fpga_rotation += 90;
+	if (sensor->i_fpga_rotation == 360)
+		sensor->i_fpga_rotation = 0;
+
+	// set new rotation
+	fpga_apply_rotation(sensor);
+
+	// Wait 50..100 ms for some video frames
+	// (approximate worst case: 40 ms for 25 Hz video)
+	// Un-freezing doesn't work reliably without this.
+	// Empirical delays; shorter ones don't work reliably.
+	
+	if (b_long_delay)
+		usleep_range(1000*1000, 1200*1000);
+	else
+		usleep_range(50*1000, 100*1000);
+	
+	// set original rotation
+	sensor->i_fpga_rotation = i_old_rotation;
+	fpga_apply_rotation(sensor);
+	
+	return 0;
 }
 
 static int we20cam_s_ctrl(struct v4l2_ctrl *ctrl)
@@ -1504,6 +1534,46 @@ static struct attribute_group we20cam_group =
     .attrs = we20cam_attrs,
 };
 
+/* timer **************************************************************/
+
+#define POLL_ADV_TIMEOUT	50	// ms
+
+struct we20cam_dev *g_sensor = NULL;
+
+void poll_workqueue(struct work_struct *p_work)
+{
+	static int old_video_lock = -1;
+	int video_lock = adv7180_we20_command(WE20_CMD_QUERY_VIDEO_LOCK, 0, 0);
+
+	if (video_lock != old_video_lock)
+	{
+		/* We just got video signal? FPGA might get locked up.
+		 * We just lost video signal? FPGA might get locked up.
+		 * */
+		if (video_lock == 0)
+		{	// got lock
+			fpga_smart_reset(g_sensor, false);
+		}
+		else
+		{	// lost lock
+			fpga_smart_reset(g_sensor, true);
+		}
+		
+		old_video_lock = video_lock;
+	}
+	
+}
+
+DECLARE_WORK(poll_wq, poll_workqueue);
+
+void poll_timer_callback(struct timer_list* p_timer)
+{
+	struct we20cam_dev *sensor = from_timer(sensor, p_timer, poll_timer);
+	g_sensor = sensor;
+	schedule_work(&poll_wq);
+	mod_timer(&sensor->poll_timer, jiffies + msecs_to_jiffies(POLL_ADV_TIMEOUT));
+}
+
 /* probe and remove ***************************************************/
 
 static int we20cam_probe(struct i2c_client *client,
@@ -1519,6 +1589,7 @@ static int we20cam_probe(struct i2c_client *client,
 	if (!sensor)
 		return -ENOMEM;
 
+printk("sensor alloc=%p\n", sensor);
 	sensor->i2c_client = client;
 
 	/*
@@ -1588,7 +1659,10 @@ static int we20cam_probe(struct i2c_client *client,
 	}
 	
 	sensor->controls_initialized = true;
-		
+	
+	timer_setup(&sensor->poll_timer, poll_timer_callback, 0);
+	mod_timer(&sensor->poll_timer, jiffies + msecs_to_jiffies(POLL_ADV_TIMEOUT));
+
 	return 0;
 
 free_ctrls:
@@ -1604,6 +1678,7 @@ static int we20cam_remove(struct i2c_client *client)
 	struct we20cam_dev *sensor = to_we20cam_dev(sd);
 	struct device *dev = &client->dev;
 
+	del_timer_sync(&sensor->poll_timer);
 	sysfs_remove_group(&dev->kobj, &we20cam_group);
 	if (sensor->dev_folder)
 		root_device_unregister(sensor->dev_folder);
