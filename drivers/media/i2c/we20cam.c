@@ -554,12 +554,12 @@ static int fpga_smart_reset(struct we20cam_dev *sensor, bool b_long_delay)
 	// save original rotation
 	int i_old_rotation = sensor->i_fpga_rotation;
 	// calc temporary new rotation
-	sensor->i_fpga_rotation += 90;
+//	sensor->i_fpga_rotation += 90;
 	if (sensor->i_fpga_rotation == 360)
 		sensor->i_fpga_rotation = 0;
 
 	// set new rotation
-	fpga_apply_rotation(sensor);
+//	fpga_apply_rotation(sensor);
 
 	// Wait 50..100 ms for some video frames
 	// (approximate worst case: 40 ms for 25 Hz video)
@@ -567,7 +567,8 @@ static int fpga_smart_reset(struct we20cam_dev *sensor, bool b_long_delay)
 	// Empirical delays; shorter ones don't work reliably.
 	
 	if (b_long_delay)
-		usleep_range(1000*1000, 1200*1000);
+//		usleep_range(1000*1000, 1200*1000);
+		usleep_range(50*1000, 100*1000);
 	else
 		usleep_range(50*1000, 100*1000);
 	
@@ -606,7 +607,7 @@ static int we20cam_s_ctrl(struct v4l2_ctrl *ctrl)
 		// save original rotation
 		int i_old_rotation = sensor->i_fpga_rotation;
 		// calc temporary new rotation
-		sensor->i_fpga_rotation += 90;
+// dvm		sensor->i_fpga_rotation += 90;
 		if (sensor->i_fpga_rotation == 360)
 			sensor->i_fpga_rotation = 0;
 			
@@ -614,7 +615,7 @@ static int we20cam_s_ctrl(struct v4l2_ctrl *ctrl)
 		if (ctrl->id == V4L2_CID_ADV_SET_INPUT)
 		{
 			// set new rotation
-			fpga_apply_rotation(sensor);
+//			fpga_apply_rotation(sensor);
 		}
 
 		ret = adv7180_we20_command(WE20_CMD_SET_CONTROL, ctrl->id, ctrl->val);
@@ -622,11 +623,11 @@ static int we20cam_s_ctrl(struct v4l2_ctrl *ctrl)
 		{
 			// wait 50..100 ms for some video frames
 			// (approximate worst case: 40 ms for 25 Hz video)
-			usleep_range(50*1000, 100*1000);
+//			usleep_range(50*1000, 100*1000);
 			
 			// set original rotation
 			sensor->i_fpga_rotation = i_old_rotation;
-			fpga_apply_rotation(sensor);
+//			fpga_apply_rotation(sensor);
 		}
 	}
 
@@ -1589,7 +1590,6 @@ static int we20cam_probe(struct i2c_client *client,
 	if (!sensor)
 		return -ENOMEM;
 
-printk("sensor alloc=%p\n", sensor);
 	sensor->i2c_client = client;
 
 	/*

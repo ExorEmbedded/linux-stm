@@ -576,6 +576,7 @@ static int adv7180_s_ctrl(struct v4l2_ctrl *ctrl)
 		ret = adv7180_write(state, ADV7180_REG_SD_SAT_CR, val);
 		break;
 	case V4L2_CID_ADV_FAST_SWITCH:
+#if 0 //dvm test
 		if (ctrl->val) {
 			/* ADI required write */
 			adv7180_write(state, 0x80d9, 0x44);
@@ -586,6 +587,7 @@ static int adv7180_s_ctrl(struct v4l2_ctrl *ctrl)
 			adv7180_write(state, 0x80d9, 0xc4);
 			adv7180_write(state, ADV7180_REG_FLCONTROL, 0x00);
 		}
+#endif
 		break;
 	case V4L2_CID_ADV_SET_INPUT:
 		ret = adv7180_select_input(state, val);
@@ -1468,6 +1470,10 @@ static int adv7180_probe(struct i2c_client *client,
 	adv7180_write(state, 0x000C, 0x36);	// enable free run
 	adv7180_write(state, 0x0000, 0x00);	// input 1
 
+	adv7180_write(state, 0x000E, 0x80); // ADI Required Write
+	adv7180_write(state, 0x009C, 0x00); // ADI Required Write
+	adv7180_write(state, 0x009C, 0xFF); // ADI Required Write
+
 //	adv7180_write(state, 0x0031, 0x02); // default vs
 	adv7180_write(state, 0x0031, 0x12); // manual vs
 	adv7180_write(state, 0x0032, 0xC2); // manual vs
@@ -1475,16 +1481,28 @@ static int adv7180_probe(struct i2c_client *client,
 //	adv7180_write(state, 0x0037, 0x21); // rev vs polarity
 	adv7180_write(state, 0x0037, 0x01); // normal vs polarity
 	
-#if 0	// deinterlacer
-// currently disabled because the one in FPGA is better
+	// deinterlacer
+#if 0
+	// currently disabled because the one in FPGA is better
 	adv7180_vpp_write(state, 0x00A3, 0x00); // ADI required write
 	adv7180_vpp_write(state, 0x005B, 0x00); // enable advanced timing mode
 	adv7180_vpp_write(state, 0x0055, 0x80); // enable deinterlacer
 
-	printk("adv7280 deinterlacer enabled\n");
+	printk(KERN_NOTICE "ADV7280 deinterlacer enabled\n");
 #else
-	printk("adv7280 deinterlacer disabled\n");
+	printk(KERN_NOTICE "ADV7280 deinterlacer disabled\n");
 #endif
+
+	// fast switching
+	adv7180_write(state, 0x80d9, 0x44);
+	adv7180_write(state, ADV7180_REG_FLCONTROL,
+		ADV7180_FLCONTROL_FL_ENABLE);
+
+	// adaptive contrast enhancement
+	adv7180_write(state, 0x000E, 0x40);	// enter user sub map 2
+	adv7180_write(state, 0x0080, 0x80);	// enable ACE
+	adv7180_write(state, 0x000E, 0x00);	// back to user sub map
+	printk(KERN_NOTICE "ADV7280 Adaptive Contrast Enhancement enabled\n");
 
 	state->controls_initialized = true;
 	
