@@ -126,6 +126,18 @@
 			gpios = <&gpioz 7 GPIO_ACTIVE_LOW>;
 			default-state = "off";
 		};
+
+		led1@3 {
+			label = "ns02:dl1:usr0";
+			gpios = <&pca9534a 6 GPIO_ACTIVE_HIGH>;
+			default-state = "on";
+		};
+
+		led2@4 {
+			label = "ns02:dl2:usr0";
+			gpios = <&pca9534a 7 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
 	};
 
 	gpio_buttons: gpio_buttons@0 {
