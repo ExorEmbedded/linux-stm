@@ -565,14 +565,14 @@
 					 <STM32_PINMUX('I',  6, AF14)>, /* LCD_B6 */
 					 <STM32_PINMUX('D',  8, AF14)>, /* LCD_B7 */
 
-					 <STM32_PINMUX('E',  4, AF4 )>, /* LCD_B0 */
- 					 <STM32_PINMUX('G', 12, AF3 )>, /* LCD_B1 */
- 					 <STM32_PINMUX('A',  3, AF4 )>, /* LCD_B2 */
- 					 <STM32_PINMUX('B',  1, AF5 )>, /* LCD_G0 */
- 					 <STM32_PINMUX('E',  6, AF3 )>, /* LCD_G1 */
- 					 <STM32_PINMUX('H',  2, AF3 )>, /* LCD_R0 */
- 					 <STM32_PINMUX('D', 15, AF4 )>, /* LCD_R1 */
- 					 <STM32_PINMUX('H',  9, AF3 )>; /* LCD_R2 */
+					 <STM32_PINMUX('E',  4, AF14 )>, /* LCD_B0 */
+ 					 <STM32_PINMUX('G', 12, AF14 )>, /* LCD_B1 */
+ 					 <STM32_PINMUX('A',  3, AF9 )>,  /* LCD_B2 */
+ 					 <STM32_PINMUX('B',  1, AF14 )>, /* LCD_G0 */
+ 					 <STM32_PINMUX('E',  6, AF14 )>, /* LCD_G1 */
+ 					 <STM32_PINMUX('H',  2, AF14 )>, /* LCD_R0 */
+ 					 <STM32_PINMUX('D', 15, AF14 )>, /* LCD_R1 */
+ 					 <STM32_PINMUX('H',  8, AF14 )>; /* LCD_R2 */
 					 
 					bias-disable;
 					drive-push-pull;
@@ -610,7 +610,7 @@
  					 <STM32_PINMUX('E',  6, ANALOG)>, /* LCD_G1 */
  					 <STM32_PINMUX('H',  2, ANALOG)>, /* LCD_R0 */
  					 <STM32_PINMUX('D', 15, ANALOG)>, /* LCD_R1 */
- 					 <STM32_PINMUX('H',  9, ANALOG)>; /* LCD_R2 */
+ 					 <STM32_PINMUX('H',  8, ANALOG)>; /* LCD_R2 */
 		};
 	};
 
@@ -644,7 +644,7 @@
  					 <STM32_PINMUX('E',  6, ANALOG)>, /* LCD_G1 */
  					 <STM32_PINMUX('H',  2, ANALOG)>, /* LCD_R0 */
  					 <STM32_PINMUX('D', 15, ANALOG)>, /* LCD_R1 */
- 					 <STM32_PINMUX('H',  9, ANALOG)>; /* LCD_R2 */
+ 					 <STM32_PINMUX('H',  8, ANALOG)>; /* LCD_R2 */
 		};
 	};
 	
