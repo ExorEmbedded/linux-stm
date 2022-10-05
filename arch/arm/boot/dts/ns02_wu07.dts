@@ -138,6 +138,12 @@
 			gpios = <&pca9534a 7 GPIO_ACTIVE_LOW>;
 			default-state = "off";
 		};
+		
+		en_kbd_bkl@4 {
+			label = "en_kbd_bkl";
+			gpios = <&gpiog 5 GPIO_ACTIVE_HIGH>;
+			default-state = "on";
+		};		
 	};
 
 	gpio_buttons: gpio_buttons@0 {
