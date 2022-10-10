@@ -93,8 +93,9 @@
  *1.37			SS							27.11.2020	Added display code #75: Futurelabs  FLC-101HML0000SA2-V1 1280x800 for WE20-10inch.
  *														          Added display code #76: Innolux  G121ICE-L01 1280x800 for WE20-12 ONLY.
  *1.38			SS							02.12.2020	Added display code #77: DMB T050800480-A9WMC-002 800x480 for WE20-5inch.
+ *1.46			SS							05.10.2022	Added display code #83: 
  *
- * NEXT AVAILABLE DISPLAY CODE: 78
+ * NEXT AVAILABLE DISPLAY CODE: 84
  */
  
 #ifndef DISPLAYCONFIG_H
@@ -1238,7 +1239,33 @@ static struct t_DisplayParams displayconfig[] = {
       .pwmfreq        = 10000,
       .brightness_min = 1,
       .brightness_max = 80,
-    },   
+	},
+    /* 83: FutureLabs FLC-070FMLG000002#00 for WE22*/
+    {
+        .dispid    = 83,
+        .rezx      = 1024, 
+        .rezy      = 600, 
+        .bpp       = 24,
+        
+        .pclk_freq = 51000, 
+        .pclk_inv  = 1,  // inverted clock polarity due SN65LVDS93 CLKSEL high (sample on rising edge)
+        
+        .hs_fp     = 10, 
+        .hs_bp     = 320, 
+        .hs_w      = 10, 
+        .hs_inv    = 1,
+        
+        .vs_fp     = 10, 
+        .vs_bp     = 35, 
+        .vs_w      = 10, 
+        .vs_inv    = 1,
+        
+        .blank_inv      = 0,
+        
+        .pwmfreq        = 6500,			//keyboard led dimming driven by TPS61165 (avoid EasyScale min freq)
+        .brightness_min = 1,		
+        .brightness_max = 80,
+    },    
     /* END OF LIST */
     {
       .dispid    = NODISPLAY,
