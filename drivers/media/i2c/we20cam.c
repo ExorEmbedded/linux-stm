@@ -261,6 +261,7 @@ static int we20cam_write_reg32_device(
 		if (ret < 0) {
 			dev_err(&client->dev, "%s: error: reg=%x, val=%x\n",
 				__func__, reg, val);
+			sensor->controls_initialized = false;
 			return ret;
 		}
 
@@ -306,6 +307,7 @@ static int we20cam_read_reg32_device(
 		if (ret < 0) {
 			dev_err(&client->dev, "%s: error: reg=%x, val=%x\n",
 				__func__, reg, *val);
+			sensor->controls_initialized = false;
 			return ret;
 		}
 		memcpy(val, &buf2[0], 4);
@@ -532,6 +534,8 @@ static void fpga_set_rotation(struct we20cam_dev *sensor);
 
 void fpga_apply_rotation(struct we20cam_dev *sensor)
 {
+	mutex_lock(&sensor->lock);
+
 	fpga_enable_all(sensor, false);
 
 	sensor->i_fpga_control_register &= ~FPGA_ROTATION_ANGLE_MASK;
@@ -547,12 +551,15 @@ void fpga_apply_rotation(struct we20cam_dev *sensor)
 	fpga_set_width(sensor);
 	fpga_set_height(sensor);
 	fpga_set_rotation(sensor);
+	
+	mutex_unlock(&sensor->lock);
 }
 
 static int fpga_smart_reset(struct we20cam_dev *sensor, bool b_long_delay)
 {
 	// save original rotation
 	int i_old_rotation = sensor->i_fpga_rotation;
+	
 	// calc temporary new rotation
 //	sensor->i_fpga_rotation += 90;
 	if (sensor->i_fpga_rotation == 360)
@@ -568,9 +575,9 @@ static int fpga_smart_reset(struct we20cam_dev *sensor, bool b_long_delay)
 	
 	if (b_long_delay)
 //		usleep_range(1000*1000, 1200*1000);
-		usleep_range(50*1000, 100*1000);
+		usleep_range(25*1000, 35*1000);
 	else
-		usleep_range(50*1000, 100*1000);
+		usleep_range(25*1000, 35*1000);
 	
 	// set original rotation
 	sensor->i_fpga_rotation = i_old_rotation;
@@ -605,11 +612,11 @@ static int we20cam_s_ctrl(struct v4l2_ctrl *ctrl)
 		 * */
 		 
 		// save original rotation
-		int i_old_rotation = sensor->i_fpga_rotation;
+//		int i_old_rotation = sensor->i_fpga_rotation;
 		// calc temporary new rotation
 // dvm		sensor->i_fpga_rotation += 90;
-		if (sensor->i_fpga_rotation == 360)
-			sensor->i_fpga_rotation = 0;
+//		if (sensor->i_fpga_rotation == 360)
+//			sensor->i_fpga_rotation = 0;
 			
 		// we need the workaround only on changing input
 		if (ctrl->id == V4L2_CID_ADV_SET_INPUT)
@@ -626,7 +633,7 @@ static int we20cam_s_ctrl(struct v4l2_ctrl *ctrl)
 //			usleep_range(50*1000, 100*1000);
 			
 			// set original rotation
-			sensor->i_fpga_rotation = i_old_rotation;
+//			sensor->i_fpga_rotation = i_old_rotation;
 //			fpga_apply_rotation(sensor);
 		}
 	}
@@ -1248,7 +1255,8 @@ static void fpga_enable_all(struct we20cam_dev *sensor, const bool b_enable)
 			WE20CAM_VIDEO_SELECT_REG,
 			i_value);
 
-		usleep_range(10 * 1000, 20 * 1000);
+// dvm test		usleep_range(10 * 1000, 20 * 1000);
+		usleep_range(1 * 1000, 2 * 1000);
 
 		i_value &= ~(1 << 6);	// reset off
 		ret = we20cam_write_reg32_device(
@@ -1572,7 +1580,10 @@ void poll_timer_callback(struct timer_list* p_timer)
 	struct we20cam_dev *sensor = from_timer(sensor, p_timer, poll_timer);
 	g_sensor = sensor;
 	schedule_work(&poll_wq);
-	mod_timer(&sensor->poll_timer, jiffies + msecs_to_jiffies(POLL_ADV_TIMEOUT));
+	if (sensor->controls_initialized)
+	{
+		mod_timer(&sensor->poll_timer, jiffies + msecs_to_jiffies(POLL_ADV_TIMEOUT));
+	}
 }
 
 /* probe and remove ***************************************************/
@@ -1585,6 +1596,11 @@ static int we20cam_probe(struct i2c_client *client,
 	struct we20cam_dev *sensor;
 	struct v4l2_mbus_framefmt *fmt;
 	int ret = 0;
+
+	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
+		dev_err(dev, "I2C adapter error\n");
+		return -EIO;
+	}
 
 	sensor = devm_kzalloc(dev, sizeof(*sensor), GFP_KERNEL);
 	if (!sensor)
@@ -1659,7 +1675,7 @@ static int we20cam_probe(struct i2c_client *client,
 	}
 	
 	sensor->controls_initialized = true;
-	
+
 	timer_setup(&sensor->poll_timer, poll_timer_callback, 0);
 	mod_timer(&sensor->poll_timer, jiffies + msecs_to_jiffies(POLL_ADV_TIMEOUT));
 

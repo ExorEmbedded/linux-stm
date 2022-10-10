@@ -576,7 +576,6 @@ static int adv7180_s_ctrl(struct v4l2_ctrl *ctrl)
 		ret = adv7180_write(state, ADV7180_REG_SD_SAT_CR, val);
 		break;
 	case V4L2_CID_ADV_FAST_SWITCH:
-#if 0 //dvm test
 		if (ctrl->val) {
 			/* ADI required write */
 			adv7180_write(state, 0x80d9, 0x44);
@@ -587,7 +586,6 @@ static int adv7180_s_ctrl(struct v4l2_ctrl *ctrl)
 			adv7180_write(state, 0x80d9, 0xc4);
 			adv7180_write(state, ADV7180_REG_FLCONTROL, 0x00);
 		}
-#endif
 		break;
 	case V4L2_CID_ADV_SET_INPUT:
 		ret = adv7180_select_input(state, val);
@@ -1366,8 +1364,9 @@ static int adv7180_probe(struct i2c_client *client,
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE_DATA))
 		return -EIO;
 
-	v4l_info(client, "chip found @ 0x%02x (%s)\n",
-		 client->addr, client->adapter->name);
+// above test just means adapter is ok; chip may or may not be connected
+//	v4l_info(client, "chip found @ 0x%02x (%s)\n",
+//		 client->addr, client->adapter->name);
 
 	state = devm_kzalloc(&client->dev, sizeof(*state), GFP_KERNEL);
 	if (state == NULL)
