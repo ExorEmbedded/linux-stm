@@ -591,6 +591,7 @@ static int we20cam_s_ctrl(struct v4l2_ctrl *ctrl)
 	struct v4l2_subdev *sd = to_we20cam_sd(ctrl);
 	struct we20cam_dev *sensor = to_we20cam_dev(sd);
 	int ret = 0;
+	int i_old_rotation = 0;
 
 	if (sensor->controls_initialized)
 	{
@@ -612,29 +613,30 @@ static int we20cam_s_ctrl(struct v4l2_ctrl *ctrl)
 		 * */
 		 
 		// save original rotation
-//		int i_old_rotation = sensor->i_fpga_rotation;
-		// calc temporary new rotation
-// dvm		sensor->i_fpga_rotation += 90;
-//		if (sensor->i_fpga_rotation == 360)
-//			sensor->i_fpga_rotation = 0;
-			
 		// we need the workaround only on changing input
 		if (ctrl->id == V4L2_CID_ADV_SET_INPUT)
 		{
+			i_old_rotation = sensor->i_fpga_rotation;
+			// calc temporary new rotation
+			sensor->i_fpga_rotation += 90;
+			if (sensor->i_fpga_rotation == 360)
+				sensor->i_fpga_rotation = 0;
+			
 			// set new rotation
-//			fpga_apply_rotation(sensor);
+			fpga_apply_rotation(sensor);
 		}
 
 		ret = adv7180_we20_command(WE20_CMD_SET_CONTROL, ctrl->id, ctrl->val);
+		
 		if (ctrl->id == V4L2_CID_ADV_SET_INPUT)
 		{
 			// wait 50..100 ms for some video frames
 			// (approximate worst case: 40 ms for 25 Hz video)
-//			usleep_range(50*1000, 100*1000);
+			usleep_range(50*1000, 100*1000);
 			
 			// set original rotation
-//			sensor->i_fpga_rotation = i_old_rotation;
-//			fpga_apply_rotation(sensor);
+			sensor->i_fpga_rotation = i_old_rotation;
+			fpga_apply_rotation(sensor);
 		}
 	}
 
