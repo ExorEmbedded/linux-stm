@@ -534,8 +534,6 @@ static void fpga_set_rotation(struct we20cam_dev *sensor);
 
 void fpga_apply_rotation(struct we20cam_dev *sensor)
 {
-	mutex_lock(&sensor->lock);
-
 	fpga_enable_all(sensor, false);
 
 	sensor->i_fpga_control_register &= ~FPGA_ROTATION_ANGLE_MASK;
@@ -551,15 +549,15 @@ void fpga_apply_rotation(struct we20cam_dev *sensor)
 	fpga_set_width(sensor);
 	fpga_set_height(sensor);
 	fpga_set_rotation(sensor);
-	
-	mutex_unlock(&sensor->lock);
 }
 
 static int fpga_smart_reset(struct we20cam_dev *sensor, bool b_long_delay)
 {
 	// save original rotation
 	int i_old_rotation = sensor->i_fpga_rotation;
-	
+
+	mutex_lock(&sensor->lock);
+
 	// calc temporary new rotation
 //	sensor->i_fpga_rotation += 90;
 	if (sensor->i_fpga_rotation == 360)
@@ -582,7 +580,9 @@ static int fpga_smart_reset(struct we20cam_dev *sensor, bool b_long_delay)
 	// set original rotation
 	sensor->i_fpga_rotation = i_old_rotation;
 	fpga_apply_rotation(sensor);
-	
+
+	mutex_unlock(&sensor->lock);
+
 	return 0;
 }
 
@@ -592,6 +592,8 @@ static int we20cam_s_ctrl(struct v4l2_ctrl *ctrl)
 	struct we20cam_dev *sensor = to_we20cam_dev(sd);
 	int ret = 0;
 	int i_old_rotation = 0;
+
+	mutex_lock(&sensor->lock);
 
 	if (sensor->controls_initialized)
 	{
@@ -639,6 +641,8 @@ static int we20cam_s_ctrl(struct v4l2_ctrl *ctrl)
 			fpga_apply_rotation(sensor);
 		}
 	}
+
+	mutex_unlock(&sensor->lock);
 
 	return ret;
 }
