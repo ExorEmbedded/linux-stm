@@ -553,10 +553,12 @@ void fpga_apply_rotation(struct we20cam_dev *sensor)
 
 static int fpga_smart_reset(struct we20cam_dev *sensor, bool b_long_delay)
 {
-	// save original rotation
-	int i_old_rotation = sensor->i_fpga_rotation;
+	int i_old_rotation = 0;
 
 	mutex_lock(&sensor->lock);
+
+	// save original rotation
+	i_old_rotation = sensor->i_fpga_rotation;
 
 	// calc temporary new rotation
 //	sensor->i_fpga_rotation += 90;
